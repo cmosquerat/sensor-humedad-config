@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0.6" y2="1">
+      <stop offset="0" stop-color="#138080"/>
+      <stop offset="1" stop-color="#085757"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#g)"/>
+  <!-- Arco de medidor (dentro de la zona segura del icono maskable) -->
+  <path d="M155.6 356.4A142 142 0 1 1 356.4 356.4" fill="none" stroke="#ffffff" stroke-opacity=".28" stroke-width="22" stroke-linecap="round"/>
+  <path d="M155.6 356.4A142 142 0 0 1 304.6 122.6" fill="none" stroke="#ffffff" stroke-width="22" stroke-linecap="round"/>
+  <!-- Gota -->
+  <path d="M256 168c-30 37-56 67-56 98a56 56 0 0 0 112 0c0-31-26-61-56-98z" fill="#ffffff"/>
+</svg>

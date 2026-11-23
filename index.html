@@ -1,0 +1,3663 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sensor de humedad</title>
+<meta name="description" content="Configura el sensor de humedad y temperatura por Bluetooth y descarga sus lecturas, sin conexión a internet.">
+<meta name="theme-color" content="#eef2f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a1113" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+/* =====================================================================
+   Tokens de diseño
+   ===================================================================== */
+:root {
+  color-scheme: light;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
+
+  --r-xs: 8px; --r-sm: 12px; --r-md: 16px; --r-lg: 22px;
+  --ease: cubic-bezier(.2, .7, .2, 1);
+  --t-fast: 140ms; --t-med: 240ms;
+
+  --bg: #eef2f1;
+  --bg-glow: rgba(11, 107, 107, .10);
+  --surface: #fbfcfc;
+  --surface-2: #f3f6f5;
+  --surface-3: #e6ecea;
+  --border: #dbe3e1;
+  --border-strong: #c3cecb;
+  --ink: #0d1a1c;
+  --ink-2: #44535a;
+  --ink-3: #66757a;
+  --accent: #0b6b6b;
+  --accent-strong: #085757;
+  --accent-soft: #dcefec;
+  --accent-ink: #ffffff;
+  --focus-ring: rgba(11, 107, 107, .38);
+
+  --temp: #d9602c;
+  --hum: #2a78d6;
+
+  --good: #17804a; --good-soft: #def2e6;
+  --warn: #935800; --warn-soft: #fbefd6;
+  --bad: #c0352f; --bad-soft: #fbe4e2;
+
+  --grid: #e4eae8;
+  --axis: #c3cecb;
+  --shadow-1: 0 1px 2px rgba(13, 26, 28, .05), 0 6px 18px -10px rgba(13, 26, 28, .18);
+  --shadow-2: 0 2px 6px rgba(13, 26, 28, .08), 0 18px 40px -18px rgba(13, 26, 28, .30);
+  --scrim: rgba(8, 18, 20, .42);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #0a1113;
+    --bg-glow: rgba(76, 194, 184, .10);
+    --surface: #111a1c;
+    --surface-2: #162124;
+    --surface-3: #1e2b2e;
+    --border: #22312f;
+    --border-strong: #34464a;
+    --ink: #e6eeed;
+    --ink-2: #a9b8ba;
+    --ink-3: #84949a;
+    --accent: #4cc2b8;
+    --accent-strong: #6fd4cb;
+    --accent-soft: #123331;
+    --accent-ink: #04201e;
+    --focus-ring: rgba(76, 194, 184, .45);
+
+    --temp: #e26a37;
+    --hum: #3f8ee6;
+
+    --good: #45c486; --good-soft: #10291d;
+    --warn: #e5a83f; --warn-soft: #2d2210;
+    --bad: #f0706a; --bad-soft: #321615;
+
+    --grid: #1d2a2c;
+    --axis: #34464a;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, .3);
+    --shadow-2: 0 18px 40px -16px rgba(0, 0, 0, .7);
+    --scrim: rgba(0, 0, 0, .6);
+  }
+}
+
+/* =====================================================================
+   Base
+   ===================================================================== */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--ink);
+  background: var(--bg);
+  background-image: radial-gradient(120% 60% at 50% -10%, var(--bg-glow), transparent 70%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+h1, h2, h3, h4, p { margin: 0; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+[hidden] { display: none !important; }
+:focus { outline: none; }
+:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--ink-3); }
+.ink2 { color: var(--ink-2); }
+svg.i { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+svg.i.sm { width: 18px; height: 18px; }
+svg.i.xs { width: 15px; height: 15px; }
+
+/* =====================================================================
+   Botones y controles
+   ===================================================================== */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 48px; padding: 0 18px;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  font-weight: 600; font-size: 15px; letter-spacing: .01em;
+  background: var(--surface-2); color: var(--ink);
+  transition: background var(--t-fast), border-color var(--t-fast), transform var(--t-fast), opacity var(--t-fast);
+  user-select: none; text-decoration: none; white-space: nowrap;
+}
+.btn:active:not(:disabled) { transform: scale(.98); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn-primary { background: var(--accent); color: var(--accent-ink); box-shadow: 0 1px 0 rgba(255,255,255,.12) inset, 0 6px 16px -8px var(--accent); }
+.btn-primary:hover:not(:disabled) { background: var(--accent-strong); }
+.btn-secondary { background: var(--surface); border-color: var(--border-strong); }
+.btn-secondary:hover:not(:disabled) { background: var(--surface-2); }
+.btn-ghost { background: transparent; color: var(--accent); }
+.btn-ghost:hover:not(:disabled) { background: var(--accent-soft); }
+.btn-danger { background: var(--bad); color: #fff; }
+.btn-danger-soft { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
+.btn-xl { min-height: 58px; font-size: 17px; border-radius: var(--r-md); padding: 0 26px; }
+.btn-sm { min-height: 40px; padding: 0 14px; font-size: 14px; }
+.btn-block { width: 100%; }
+.btn .spin { width: 18px; height: 18px; }
+
+.spin {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid currentColor; border-right-color: transparent;
+  animation: spin .8s linear infinite; flex: none; display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.seg {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+  background: var(--surface-3); border-radius: var(--r-sm); padding: 4px; gap: 2px;
+}
+.seg button {
+  min-height: 40px; border: 0; border-radius: 9px; background: transparent;
+  font-weight: 600; font-size: 14px; color: var(--ink-2);
+  transition: background var(--t-fast), color var(--t-fast), box-shadow var(--t-fast);
+}
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-1); }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 36px; padding: 0 12px; border-radius: 999px;
+  border: 1px solid var(--border-strong); background: var(--surface);
+  font-size: 14px; font-weight: 500; color: var(--ink-2);
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+}
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 18px;
+  background: var(--surface-3); color: var(--ink-2); white-space: nowrap;
+}
+.badge.good { background: var(--good-soft); color: var(--good); }
+.badge.warn { background: var(--warn-soft); color: var(--warn); }
+.badge.bad { background: var(--bad-soft); color: var(--bad); }
+.badge.accent { background: var(--accent-soft); color: var(--accent); }
+.badge svg.i { width: 13px; height: 13px; stroke-width: 2.2; }
+
+/* =====================================================================
+   Pantalla de conexión
+   ===================================================================== */
+.connect {
+  min-height: 100vh; min-height: 100dvh;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: max(28px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
+}
+.connect-inner { width: 100%; max-width: 420px; display: flex; flex-direction: column; align-items: stretch; text-align: center; }
+.dial { width: 200px; height: 200px; margin: 0 auto 18px; position: relative; }
+.dial svg { width: 100%; height: 100%; overflow: visible; }
+.dial .needle { transform-origin: 100px 100px; animation: needle 7s var(--ease) infinite alternate; }
+@keyframes needle { 0% { transform: rotate(-24deg); } 45% { transform: rotate(18deg); } 100% { transform: rotate(4deg); } }
+.dial.searching .pulse { animation: pulse 1.8s ease-out infinite; }
+.dial .pulse { opacity: 0; transform-origin: 100px 100px; }
+@keyframes pulse { 0% { opacity: .5; transform: scale(.55); } 100% { opacity: 0; transform: scale(1.15); } }
+.dial .trk { fill: none; stroke: var(--surface-3); stroke-width: 10; stroke-linecap: round; }
+.dial .val { fill: none; stroke: var(--accent); stroke-width: 10; stroke-linecap: round; }
+.dial .tk { stroke: var(--border-strong); stroke-width: 1.5; stroke-linecap: round; }
+.dial .tk.mj { stroke: var(--ink-3); stroke-width: 2; }
+.dial .dl { fill: var(--ink-3); font: 600 9px var(--font); text-anchor: middle; }
+.dial .dv { fill: var(--ink-3); font: 700 10px var(--font); letter-spacing: .1em; text-anchor: middle; }
+.dial .nd { stroke: var(--ink); stroke-width: 3; stroke-linecap: round; }
+.dial .hub { fill: var(--surface); stroke: var(--border-strong); stroke-width: 1.5; }
+.dial .drop { fill: var(--hum); }
+.dial .pulse { fill: none; stroke: var(--accent); stroke-width: 2; }
+.connect h1 { font-size: 28px; font-weight: 700; letter-spacing: -.02em; }
+.connect .lead { color: var(--ink-2); margin-top: 8px; font-size: 16px; }
+.steps { list-style: none; margin: 26px 0 22px; padding: 0; display: grid; gap: 10px; text-align: left; }
+.steps li {
+  display: grid; grid-template-columns: 32px 1fr; gap: 12px; align-items: start;
+  padding: 14px; border-radius: var(--r-md); background: var(--surface); border: 1px solid var(--border);
+  font-size: 15px; color: var(--ink-2);
+}
+.steps li b { color: var(--ink); font-weight: 650; }
+.steps .n {
+  width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 14px;
+}
+.connect .actions { display: grid; gap: 10px; }
+.connect-msg { min-height: 22px; margin-top: 14px; font-size: 14px; color: var(--ink-2); }
+.connect-msg.err { color: var(--bad); }
+.connect-foot { margin-top: 26px; font-size: 13px; color: var(--ink-3); display: flex; gap: 6px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.connect-foot .dot { width: 3px; height: 3px; border-radius: 50%; background: currentColor; opacity: .6; }
+
+.notice {
+  display: grid; grid-template-columns: 24px 1fr; gap: 12px; text-align: left;
+  padding: 14px 16px; border-radius: var(--r-md); margin-bottom: 16px;
+  background: var(--warn-soft); color: var(--ink); font-size: 15px;
+}
+.notice svg.i { color: var(--warn); margin-top: 1px; }
+.notice b { display: block; margin-bottom: 2px; }
+.notice p { color: var(--ink-2); }
+.notice.info { background: var(--accent-soft); }
+.notice.info svg.i { color: var(--accent); }
+.notice.bad { background: var(--bad-soft); }
+.notice.bad svg.i { color: var(--bad); }
+
+/* =====================================================================
+   Estructura principal
+   ===================================================================== */
+.shell { min-height: 100vh; min-height: 100dvh; }
+.topbar {
+  position: sticky; top: 0; z-index: 20;
+  padding: calc(env(safe-area-inset-top) + 10px) 16px 10px;
+  display: flex; align-items: center; gap: 12px;
+}
+.topbar::before {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  -webkit-backdrop-filter: saturate(1.4) blur(14px); backdrop-filter: saturate(1.4) blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+@supports not (background: color-mix(in srgb, red 50%, blue)) { .topbar::before { background: var(--bg); } }
+.mark {
+  width: 40px; height: 40px; border-radius: 12px; flex: none; display: grid; place-items: center;
+  background: linear-gradient(160deg, var(--accent), var(--accent-strong)); color: var(--accent-ink);
+}
+.mark svg { width: 24px; height: 24px; }
+.dev { min-width: 0; flex: 1; }
+.dev-name { font-weight: 700; font-size: 17px; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dev-sub { font-size: 13px; color: var(--ink-3); display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; overflow: hidden; }
+.dev-sub .countdown { white-space: nowrap; }
+.pill {
+  display: inline-flex; align-items: center; gap: 8px; flex: none;
+  height: 36px; padding: 0 12px 0 10px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--border); font-size: 13px; font-weight: 600; color: var(--ink-2);
+}
+.pill .led { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-3); position: relative; }
+.pill[data-state="connected"] .led { background: var(--good); }
+.pill[data-state="connected"] .led::after {
+  content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--good);
+  opacity: 0; animation: halo 2.4s ease-out infinite;
+}
+@keyframes halo { 0% { opacity: .55; transform: scale(.6); } 100% { opacity: 0; transform: scale(1.5); } }
+.pill[data-state="connecting"] .led { background: var(--warn); animation: blink 1s ease-in-out infinite; }
+@keyframes blink { 50% { opacity: .3; } }
+.pill[data-state="disconnected"] .led { background: var(--bad); }
+.pill[data-state="demo"] .led { background: var(--accent); }
+.countdown { display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
+.countdown svg { width: 14px; height: 14px; transform: rotate(-90deg); }
+.countdown circle { fill: none; stroke-width: 3; }
+.countdown .trk { stroke: var(--surface-3); }
+.countdown .val { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+.countdown.low .val { stroke: var(--warn); }
+.syncbar { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; overflow: hidden; }
+.syncbar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width var(--t-med) var(--ease); }
+
+.nav {
+  position: fixed; z-index: 30; left: 0; right: 0; bottom: 0;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+  background: var(--surface); border-top: 1px solid var(--border);
+}
+.nav button {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  min-height: 56px; padding: 4px 2px; border: 0; background: none; border-radius: var(--r-sm);
+  font-size: 12px; font-weight: 600; color: var(--ink-3);
+  transition: color var(--t-fast);
+}
+.nav button .ic {
+  width: 56px; height: 30px; border-radius: 999px; display: grid; place-items: center;
+  transition: background var(--t-med) var(--ease);
+}
+.nav button[aria-selected="true"] { color: var(--ink); }
+.nav button[aria-selected="true"] .ic { background: var(--accent-soft); color: var(--accent); }
+.nav .nav-brand { display: none; }
+
+.content {
+  max-width: 760px; margin: 0 auto;
+  padding: 6px 16px calc(100px + env(safe-area-inset-bottom));
+}
+.tab { display: grid; gap: 14px; animation: tabin var(--t-med) var(--ease); }
+@keyframes tabin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.banner {
+  display: grid; grid-template-columns: 24px 1fr; gap: 12px;
+  padding: 14px 16px; border-radius: var(--r-md); margin: 4px 0 14px;
+  background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-1);
+}
+.banner svg.i { margin-top: 1px; color: var(--ink-3); }
+.banner[data-kind="bye"] svg.i { color: var(--accent); }
+.banner[data-kind="lost"] svg.i { color: var(--bad); }
+.banner[data-kind="busy"] svg.i { color: var(--warn); }
+.banner b { display: block; font-size: 15px; }
+.banner p { color: var(--ink-2); font-size: 14px; margin-top: 2px; }
+.banner .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+/* =====================================================================
+   Tarjetas
+   ===================================================================== */
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1); padding: 18px;
+}
+.card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.card-head .hic {
+  width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; flex: none;
+  background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--border);
+}
+.card-head h2, .card-head h3 { font-size: 16px; font-weight: 700; letter-spacing: -.005em; }
+.card-head p { font-size: 13px; color: var(--ink-3); }
+.card-head .grow { flex: 1; min-width: 0; }
+.eyebrow { font-size: 12px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.grid2 { display: grid; gap: 14px; grid-template-columns: 1fr; }
+@media (min-width: 560px) { .grid2 { grid-template-columns: 1fr 1fr; } }
+
+/* ----- Panel: lectura ----- */
+.hero { padding: 18px 18px 16px; position: relative; overflow: hidden; }
+.hero-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.hero-age { font-size: 13px; color: var(--ink-3); text-align: right; }
+.hero-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.metric { min-width: 0; padding-right: 12px; }
+.metric + .metric { padding: 0 0 0 16px; border-left: 1px solid var(--border); }
+.metric-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.key { width: 14px; height: 3px; border-radius: 2px; flex: none; display: inline-block; }
+.key.t { background: var(--temp); }
+.key.rh { background: var(--hum); }
+.metric-value { display: flex; align-items: flex-start; gap: 3px; margin-top: 6px; line-height: 1; min-height: 58px; }
+.metric-value .v { font-size: clamp(40px, 12.5vw, 60px); font-weight: 300; letter-spacing: -.04em; }
+.metric-value .u { font-size: 18px; font-weight: 500; color: var(--ink-2); margin-top: 7px; }
+.metric-value .na { font-size: 15px; font-weight: 600; color: var(--bad); display: inline-flex; gap: 6px; align-items: center; margin-top: 18px; }
+.metric canvas { display: block; width: 100%; height: 44px; margin-top: 10px; cursor: pointer; }
+.metric-sub { font-size: 12px; color: var(--ink-3); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.hero-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.hero-foot .live { font-size: 13px; color: var(--ink-3); }
+.hero.flash::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  box-shadow: inset 0 0 0 2px var(--accent); animation: flash 1.2s var(--ease) forwards;
+}
+@keyframes flash { from { opacity: 1; } to { opacity: 0; } }
+
+.skel { display: inline-block; border-radius: 8px; background: linear-gradient(90deg, var(--surface-3), var(--surface-2), var(--surface-3)); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+/* ----- Batería ----- */
+.batt-row { display: flex; align-items: center; gap: 14px; }
+.batt {
+  width: 58px; height: 28px; border-radius: 7px; border: 2px solid var(--ink-2); padding: 2px;
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; position: relative; flex: none;
+}
+.batt::after { content: ""; position: absolute; right: -6px; top: 7px; width: 3px; height: 10px; border-radius: 0 2px 2px 0; background: var(--ink-2); }
+.batt i { border-radius: 2px; background: var(--surface-3); }
+.batt i.on { background: var(--good); }
+.batt.mid i.on { background: var(--warn); }
+.batt.low i.on { background: var(--bad); }
+.batt.usb { border-color: var(--accent); }
+.batt.usb::after { background: var(--accent); }
+.big-stat { font-size: 30px; font-weight: 400; letter-spacing: -.02em; line-height: 1.05; }
+.big-stat small { font-size: 15px; color: var(--ink-2); font-weight: 500; letter-spacing: 0; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; margin: 14px 0 0; font-size: 14px; }
+.kv dt { color: var(--ink-3); }
+.kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); min-width: 0; overflow-wrap: anywhere; }
+
+/* ----- Medidor (uso de memoria, autonomía) ----- */
+.meter { height: 8px; border-radius: 999px; background: var(--accent-soft); overflow: hidden; }
+.meter i { display: block; height: 100%; border-radius: 999px; background: var(--accent); transition: width var(--t-med) var(--ease); min-width: 4px; }
+.meter.warn { background: var(--warn-soft); } .meter.warn i { background: var(--warn); }
+
+/* =====================================================================
+   Datos
+   ===================================================================== */
+.toolbar { display: flex; flex-direction: column; gap: 12px; }
+.chart.is-empty canvas, .chart.is-empty .plot-head, .chart.is-empty .chart-foot, .chart.is-empty .tip { display: none; }
+.sync {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center;
+  padding: 12px 14px; border-radius: var(--r-md); background: var(--accent-soft); font-size: 14px;
+}
+.sync .spin { color: var(--accent); }
+.sync .meter { grid-column: 1 / -1; background: rgba(127, 127, 127, .16); height: 6px; }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 14px; }
+.stat .metric-label { font-size: 12px; }
+.stat-vals { display: flex; justify-content: space-between; gap: 6px; margin-top: 8px; }
+.stat-vals div { display: flex; flex-direction: column; min-width: 0; }
+.stat-vals span { font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+.stat-vals b { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+
+.chart { position: relative; padding: 14px 6px 10px 8px; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.chart:focus-visible { box-shadow: 0 0 0 3px var(--focus-ring); }
+.plot-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 0 10px 4px 8px; }
+.plot-head .metric-label { font-size: 14px; color: var(--ink); }
+.plot-head .metric-label span { color: var(--ink-3); font-weight: 500; }
+.plot-head .rng { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.plot-head + canvas { margin-bottom: 10px; }
+.chart canvas { display: block; width: 100%; }
+.chart.loading canvas { opacity: .45; transition: opacity var(--t-med); }
+.tip {
+  position: absolute; z-index: 5; top: 40px; left: 0; min-width: 168px; max-width: 220px;
+  padding: 10px 12px; border-radius: var(--r-sm);
+  background: var(--surface); border: 1px solid var(--border-strong); box-shadow: var(--shadow-2);
+  font-size: 13px; pointer-events: none; transition: opacity var(--t-fast);
+}
+.tip .when { font-size: 12px; color: var(--ink-3); margin-bottom: 6px; font-weight: 600; }
+.tip .row { display: grid; grid-template-columns: 14px auto 1fr; gap: 8px; align-items: center; line-height: 1.7; }
+.tip .row b { font-size: 16px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.tip .row span:last-child { color: var(--ink-3); font-size: 12px; text-align: right; }
+.tip .extra { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); color: var(--ink-3); font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.chart-foot { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 4px 10px 0 8px; font-size: 12px; color: var(--ink-3); }
+.chart-foot .tri { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid var(--bad); display: inline-block; margin-right: 5px; }
+.empty { text-align: center; padding: 34px 20px; color: var(--ink-2); }
+.empty .em-ic { width: 56px; height: 56px; border-radius: 18px; margin: 0 auto 12px; display: grid; place-items: center; background: var(--surface-2); color: var(--ink-3); border: 1px solid var(--border); }
+.empty b { display: block; color: var(--ink); font-size: 16px; margin-bottom: 4px; }
+.empty p { font-size: 14px; max-width: 320px; margin: 0 auto; }
+
+.tbl-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.tbl-head h3 { font-size: 16px; font-weight: 700; }
+.tbl-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.tbl-wrap { margin: 0 -18px; overflow-x: auto; }
+table.rd { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+table.rd th { text-align: right; font-size: 11px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+table.rd td { text-align: right; padding: 9px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+table.rd th:first-child, table.rd td:first-child { text-align: left; padding-left: 18px; }
+table.rd th:last-child, table.rd td:last-child { padding-right: 18px; }
+table.rd td .d { display: block; font-size: 12px; color: var(--ink-3); }
+table.rd tr.flag-err td { background: var(--bad-soft); }
+table.rd tr.flag-time td { background: var(--warn-soft); }
+table.rd td.na { color: var(--bad); font-weight: 600; }
+.flags { display: inline-flex; gap: 4px; justify-content: flex-end; flex-wrap: wrap; }
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--ink-3); }
+
+/* =====================================================================
+   Formularios
+   ===================================================================== */
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.field { display: block; margin-top: 16px; }
+.field:first-of-type { margin-top: 0; }
+.field > label, .field .lbl { display: block; font-size: 14px; font-weight: 650; margin-bottom: 6px; }
+.input {
+  display: flex; align-items: center; min-height: 50px;
+  border: 1px solid var(--border-strong); border-radius: var(--r-sm); background: var(--surface);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+.input:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-ring); }
+.input input {
+  flex: 1; min-width: 0; height: 48px; padding: 0 14px; border: 0; background: transparent; font-size: 16px;
+}
+.input input::placeholder { color: var(--ink-3); opacity: 1; }
+.input .unit { padding: 0 14px 0 4px; color: var(--ink-3); font-size: 15px; }
+.input .ib {
+  width: 46px; height: 46px; margin-right: 2px; border: 0; background: none; border-radius: 10px;
+  display: grid; place-items: center; color: var(--ink-3); flex: none;
+}
+.input .ib:hover { color: var(--ink); background: var(--surface-2); }
+.field.invalid .input { border-color: var(--bad); }
+.field.invalid .input:focus-within { box-shadow: 0 0 0 3px rgba(192, 53, 47, .25); }
+.field.changed > label::after, .field.changed .lbl::after {
+  content: "•"; color: var(--accent); margin-left: 6px;
+}
+.hint { font-size: 13px; color: var(--ink-3); margin-top: 6px; }
+.ferr { font-size: 13px; color: var(--bad); margin-top: 6px; font-weight: 600; display: none; }
+.field.invalid .ferr { display: block; }
+.check { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 14px; color: var(--ink-2); min-height: 32px; }
+.check input { width: 20px; height: 20px; accent-color: var(--accent); margin: 0; }
+.row-inline { display: flex; gap: 8px; }
+.row-inline .input { flex: 1; min-width: 0; }
+.stepper { display: grid; grid-template-columns: 50px minmax(0, 1fr) 50px; gap: 8px; }
+.stepper .btn { min-height: 50px; padding: 0; font-size: 22px; font-weight: 500; }
+.stepper .input input { text-align: center; }
+input[type="range"] { width: 100%; height: 36px; accent-color: var(--accent); margin: 0; }
+.range-row { display: flex; align-items: center; gap: 14px; }
+.range-row output { min-width: 70px; text-align: right; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+.impact {
+  margin-top: 18px; padding: 14px; border-radius: var(--r-md); background: var(--surface-2); border: 1px solid var(--border);
+}
+.impact-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.impact-top b { font-size: 22px; font-weight: 650; letter-spacing: -.01em; }
+.impact .split { display: flex; height: 8px; border-radius: 999px; overflow: hidden; gap: 2px; margin: 12px 0 8px; background: var(--surface); }
+.impact .split i { display: block; height: 100%; }
+.impact .split .up { background: var(--accent); }
+.impact .split .me { background: var(--ink-3); }
+.impact .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--ink-3); }
+.impact .legend span { display: inline-flex; align-items: center; gap: 6px; }
+.impact .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.impact p { font-size: 13px; color: var(--ink-2); margin-top: 8px; }
+
+.scan { margin-top: 10px; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+.scan-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; font-size: 13px; color: var(--ink-3); background: var(--surface-2); }
+.scan ul { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow-y: auto; }
+.scan li + li { border-top: 1px solid var(--border); }
+.scan button {
+  width: 100%; display: grid; grid-template-columns: 26px 1fr auto; gap: 12px; align-items: center;
+  min-height: 54px; padding: 8px 14px; border: 0; background: var(--surface); text-align: left;
+}
+.scan button:hover { background: var(--surface-2); }
+.scan button[aria-current="true"] { background: var(--accent-soft); }
+.scan .ssid { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scan .meta { font-size: 12px; color: var(--ink-3); display: flex; gap: 6px; align-items: center; }
+.bars { display: inline-grid; grid-template-columns: repeat(4, 4px); gap: 2px; align-items: end; height: 18px; }
+.bars i { display: block; border-radius: 1.5px; background: var(--surface-3); }
+.bars i:nth-child(1) { height: 25%; } .bars i:nth-child(2) { height: 50%; } .bars i:nth-child(3) { height: 75%; } .bars i:nth-child(4) { height: 100%; }
+.bars i.on { background: var(--accent); }
+.bars.weak i.on { background: var(--warn); }
+
+.savebar {
+  position: fixed; z-index: 25; left: 12px; right: 12px; bottom: calc(80px + env(safe-area-inset-bottom));
+  max-width: 736px; margin: 0 auto;
+  display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 16px;
+  border-radius: var(--r-md); background: var(--ink); color: var(--bg); box-shadow: var(--shadow-2);
+  animation: rise var(--t-med) var(--ease);
+}
+.savebar span { flex: 1; font-size: 14px; font-weight: 600; }
+.savebar .btn-ghost { color: var(--bg); }
+.savebar .btn-ghost:hover { background: rgba(127, 127, 127, .2); }
+.savebar .btn-primary { box-shadow: none; }
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* ----- Sistema ----- */
+.actions-list { display: grid; gap: 2px; margin: 0 -18px -18px; }
+.act {
+  display: grid; grid-template-columns: 40px 1fr auto; gap: 14px; align-items: center;
+  padding: 12px 18px; min-height: 64px; border: 0; background: none; text-align: left; width: 100%;
+  border-top: 1px solid var(--border);
+}
+.act:hover:not(:disabled) { background: var(--surface-2); }
+.act:disabled { opacity: .45; cursor: not-allowed; }
+.act .hic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--border); }
+.act b { display: block; font-size: 15px; }
+.act small { display: block; font-size: 13px; color: var(--ink-3); }
+.act.danger b { color: var(--bad); }
+.act.danger .hic { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
+.act .chev { color: var(--ink-3); }
+.result { margin: 0 0 14px; padding: 12px 14px; border-radius: var(--r-md); background: var(--surface-2); border: 1px solid var(--border); font-size: 14px; }
+.result .kv { margin-top: 8px; }
+
+/* =====================================================================
+   Toasts y diálogos
+   ===================================================================== */
+.toasts {
+  position: fixed; z-index: 60; left: 0; right: 0; bottom: calc(88px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; padding: 0 16px;
+}
+.toast {
+  display: flex; align-items: center; gap: 10px; max-width: 440px;
+  padding: 12px 16px; border-radius: 14px; background: var(--ink); color: var(--bg);
+  font-size: 14px; font-weight: 550; box-shadow: var(--shadow-2); pointer-events: auto;
+  animation: rise var(--t-med) var(--ease);
+}
+.toast.out { opacity: 0; transform: translateY(8px); transition: opacity var(--t-med), transform var(--t-med); }
+.toast svg.i { width: 18px; height: 18px; }
+.toast.ok svg.i { color: var(--good); }
+.toast.err svg.i { color: var(--bad); }
+@media (prefers-color-scheme: light) { .toast.ok svg.i { color: #6fdca4; } .toast.err svg.i { color: #ff9d97; } }
+
+dialog {
+  border: 0; padding: 0; border-radius: var(--r-lg); width: min(440px, calc(100vw - 32px));
+  background: var(--surface); color: var(--ink); box-shadow: var(--shadow-2);
+}
+dialog::backdrop { background: var(--scrim); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+dialog[open] { animation: pop var(--t-med) var(--ease); }
+@keyframes pop { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+.dlg { padding: 22px 22px 18px; }
+.dlg h2 { font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+.dlg p { color: var(--ink-2); margin-top: 8px; font-size: 15px; }
+.dlg .check { margin-top: 14px; padding: 12px; border-radius: var(--r-sm); background: var(--surface-2); color: var(--ink); align-items: flex-start; }
+.dlg .check input { margin-top: 1px; }
+.dlg .check small { display: block; color: var(--ink-3); font-size: 13px; margin-top: 2px; }
+.dlg-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+/* =====================================================================
+   Escritorio
+   ===================================================================== */
+@media (min-width: 900px) {
+  .shell { display: grid; grid-template-columns: 240px 1fr; grid-template-rows: auto 1fr; grid-template-areas: "nav top" "nav main"; }
+  .topbar { grid-area: top; padding: 14px 28px; }
+  .topbar .mark { display: none; }
+  .content { grid-area: main; width: 100%; max-width: 860px; padding: 8px 28px 60px; margin: 0; }
+  .nav {
+    grid-area: nav; position: sticky; top: 0; height: 100vh; height: 100dvh;
+    display: flex; flex-direction: column; gap: 4px; padding: 18px 14px;
+    border-top: 0; border-right: 1px solid var(--border); background: var(--surface);
+  }
+  .nav .nav-brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px; font-weight: 700; color: var(--ink); }
+  .nav button { flex-direction: row; justify-content: flex-start; gap: 6px; min-height: 46px; font-size: 15px; padding: 0 6px; }
+  .nav button .ic { width: 40px; height: 34px; }
+  .nav button[aria-selected="true"] { background: var(--accent-soft); }
+  .nav button[aria-selected="true"] .ic { background: transparent; }
+  .toasts { bottom: 28px; }
+  .savebar { left: 252px; right: 12px; bottom: 20px; }
+  .hero-grid .metric-value .v { font-size: 64px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
+@media (forced-colors: active) {
+  .key, .bars i.on, .batt i.on, .meter i { forced-color-adjust: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- Iconos -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 3.2c-3.3 4.1-6.2 7.4-6.2 10.8a6.2 6.2 0 0 0 12.4 0c0-3.4-2.9-6.7-6.2-10.8z"/></symbol>
+    <symbol id="i-mark" viewBox="0 0 24 24"><path d="M4.6 16.4a8 8 0 1 1 14.8 0" stroke-width="1.9"/><path d="M12 7.6c-1.7 2.1-3.1 3.8-3.1 5.5a3.1 3.1 0 0 0 6.2 0c0-1.7-1.4-3.4-3.1-5.5z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4.2 16.5a8.5 8.5 0 1 1 15.6 0"/><path d="M12 14.5l3.6-4.6"/><circle cx="12" cy="14.8" r="1.4"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 4v16h16"/><path d="M7.5 15l3.2-4.2 3 2.4 4.8-6.4"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h9M18 7h2M4 17h3M11 17h9"/><circle cx="15.5" cy="7" r="2.3"/><circle cx="8.5" cy="17" r="2.3"/></symbol>
+    <symbol id="i-chip" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2"/><path d="M10 3.5V7M14 3.5V7M10 17v3.5M14 17v3.5M3.5 10H7M3.5 14H7M17 10h3.5M17 14h3.5"/></symbol>
+    <symbol id="i-bt" viewBox="0 0 24 24"><path d="M7 7.5l10 9-5 4.5V3l5 4.5-10 9"/></symbol>
+    <symbol id="i-therm" viewBox="0 0 24 24"><path d="M14 14.4V5.2a2 2 0 1 0-4 0v9.2a4 4 0 1 0 4 0z"/></symbol>
+    <symbol id="i-batt" viewBox="0 0 24 24"><rect x="2.5" y="7.5" width="17" height="9" rx="2.2"/><path d="M22 10.5v3"/></symbol>
+    <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18.5a4.2 4.2 0 0 1-.7-8.35A6 6 0 0 1 17.8 9a4.6 4.6 0 0 1 .2 9.5"/><path d="M12 20v-7M9.5 15.5 12 13l2.5 2.5"/></symbol>
+    <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.4a9.5 9.5 0 0 1 13 0M8.8 15.7a5 5 0 0 1 6.4 0"/><circle cx="12" cy="19" r=".9" fill="currentColor"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.2"/><path d="M8.2 10.5V7.8a3.8 3.8 0 0 1 7.6 0v2.7"/></symbol>
+    <symbol id="i-server" viewBox="0 0 24 24"><rect x="3.5" y="4" width="17" height="7" rx="2"/><rect x="3.5" y="13" width="17" height="7" rx="2"/><path d="M7.5 7.5h.01M7.5 16.5h.01"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></symbol>
+    <symbol id="i-cog" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4.5v4.5h-4.5"/></symbol>
+    <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3.5v8"/><path d="M6.6 6.8a7.6 7.6 0 1 0 10.8 0"/></symbol>
+    <symbol id="i-reset" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 4.5v4.5h4.5"/><path d="M12 8.5v4l2.5 1.5"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 20h14"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="m8.2 13.2 7.6 4.1M15.8 6.7l-7.6 4.1"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 4.2 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4M12 17h.01"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-chev-l" viewBox="0 0 24 24"><path d="M14.5 6 8.5 12l6 6"/></symbol>
+    <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="M9.5 6l6 6-6 6"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M10.6 5.6A9.7 9.7 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a16 16 0 0 1-2.6 3.4M6.6 6.6C3.9 8.3 2.5 12 2.5 12s3.5 6.5 9.5 6.5a9.3 9.3 0 0 0 5.2-1.6M9.9 9.9a2.8 2.8 0 0 0 4 4M3 3l18 18"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
+    <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 2.5V7M15 2.5V7M6.5 7h11v3.5a5.5 5.5 0 0 1-11 0z"/><path d="M12 16v5.5"/></symbol>
+    <symbol id="i-flask" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6.2L4.6 18.6A2 2 0 0 0 6.3 21.5h11.4a2 2 0 0 0 1.7-2.9L14 9.2V3"/><path d="M7.5 15h9"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2.5 4.5 13.5h6.5l-1 8 8.5-11h-6.5z"/></symbol>
+    <symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6M4.5 12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M11 18.5h2"/></symbol>
+    <symbol id="i-unlink" viewBox="0 0 24 24"><path d="M9.5 14.5 7.3 16.7a3 3 0 0 1-4.2-4.2l2.6-2.6M14.5 9.5l2.2-2.2a3 3 0 0 1 4.2 4.2l-2.6 2.6M4 4l16 16"/></symbol>
+    <symbol id="i-install" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v7M9 12.5l3 3 3-3"/></symbol>
+  </defs>
+</svg>
+
+<!-- ============================ Conexión ============================ -->
+<section id="view-connect" class="connect" aria-labelledby="ttl-connect">
+  <div class="connect-inner">
+    <div class="dial" id="dial" aria-hidden="true"></div>
+    <h1 id="ttl-connect">Sensor de humedad</h1>
+    <p class="lead">Configura el sensor y descarga sus lecturas por Bluetooth, sin necesidad de internet.</p>
+
+    <ol class="steps">
+      <li><span class="n">1</span><span><b>Pulsa el botón WAKE</b> del sensor. Quedará unos minutos en modo configuración.</span></li>
+      <li><span class="n">2</span><span><b>Pulsa «Conectar sensor»</b> y elige tu sensor en la lista del teléfono.</span></li>
+    </ol>
+
+    <div id="bt-unsupported" class="notice" role="alert" hidden>
+      <svg class="i"><use href="#i-alert"/></svg>
+      <div><b id="bt-unsupported-title">Este navegador no permite Bluetooth</b><p id="bt-unsupported-text"></p></div>
+    </div>
+
+    <div class="actions">
+      <button id="btn-connect" class="btn btn-primary btn-xl" type="button">
+        <svg class="i"><use href="#i-bt"/></svg><span>Conectar sensor</span>
+      </button>
+      <button id="btn-demo" class="btn btn-ghost" type="button">
+        <svg class="i sm"><use href="#i-flask"/></svg><span>Probar sin sensor</span>
+      </button>
+      <button id="btn-install" class="btn btn-ghost" type="button" hidden>
+        <svg class="i sm"><use href="#i-install"/></svg><span>Instalar en el teléfono</span>
+      </button>
+    </div>
+    <p id="connect-msg" class="connect-msg" role="status" aria-live="polite"></p>
+
+    <div class="connect-foot">
+      <span id="offline-state">Funciona sin internet</span><span class="dot"></span><span>Las lecturas se guardan en este teléfono</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ App ============================ -->
+<div id="view-main" class="shell" hidden>
+  <header class="topbar">
+    <div class="mark" aria-hidden="true"><svg class="i"><use href="#i-mark"/></svg></div>
+    <div class="dev">
+      <div class="dev-name" id="hdr-name">Sensor</div>
+      <div class="dev-sub" id="hdr-sub" aria-live="polite">—</div>
+    </div>
+    <div class="pill" id="hdr-pill" data-state="connecting" role="status"><span class="led"></span><span id="hdr-pill-text">Conectando…</span></div>
+    <div class="syncbar" aria-hidden="true"><i id="hdr-sync"></i></div>
+  </header>
+
+  <nav class="nav" role="tablist" aria-label="Secciones">
+    <div class="nav-brand"><span class="mark"><svg class="i"><use href="#i-mark"/></svg></span>Sensor de humedad</div>
+    <button role="tab" id="tb-panel" aria-controls="tab-panel" aria-selected="true" data-tab="panel"><span class="ic"><svg class="i"><use href="#i-gauge"/></svg></span>Panel</button>
+    <button role="tab" id="tb-datos" aria-controls="tab-datos" aria-selected="false" tabindex="-1" data-tab="datos"><span class="ic"><svg class="i"><use href="#i-chart"/></svg></span>Datos</button>
+    <button role="tab" id="tb-config" aria-controls="tab-config" aria-selected="false" tabindex="-1" data-tab="config"><span class="ic"><svg class="i"><use href="#i-sliders"/></svg></span>Configuración</button>
+    <button role="tab" id="tb-sistema" aria-controls="tab-sistema" aria-selected="false" tabindex="-1" data-tab="sistema"><span class="ic"><svg class="i"><use href="#i-chip"/></svg></span>Sistema</button>
+  </nav>
+
+  <main class="content">
+    <div id="banner" class="banner" role="alert" hidden>
+      <svg class="i"><use id="banner-ic" href="#i-info"/></svg>
+      <div>
+        <b id="banner-title"></b>
+        <p id="banner-text"></p>
+        <div class="row" id="banner-actions"></div>
+      </div>
+    </div>
+
+    <!-- ----------------------------- Panel ----------------------------- -->
+    <section class="tab" id="tab-panel" role="tabpanel" aria-labelledby="tb-panel">
+      <div class="card hero" id="hero">
+        <div class="hero-top">
+          <span class="eyebrow" id="hero-kind">Lectura actual</span>
+          <span class="hero-age" id="hero-age"></span>
+        </div>
+        <div class="hero-grid">
+          <div class="metric">
+            <div class="metric-label"><i class="key t"></i>Temperatura</div>
+            <div class="metric-value" id="hero-t"><span class="skel" style="width:110px;height:50px"></span></div>
+            <canvas id="spark-t" aria-label="Temperatura de las últimas 24 horas. Toca para ver la gráfica." role="img"></canvas>
+            <div class="metric-sub" id="hero-t-sub">&nbsp;</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label"><i class="key rh"></i>Humedad relativa</div>
+            <div class="metric-value" id="hero-rh"><span class="skel" style="width:110px;height:50px"></span></div>
+            <canvas id="spark-rh" aria-label="Humedad de las últimas 24 horas. Toca para ver la gráfica." role="img"></canvas>
+            <div class="metric-sub" id="hero-rh-sub">&nbsp;</div>
+          </div>
+        </div>
+        <div class="hero-foot">
+          <span class="live" id="hero-live">Últimas 24 h</span>
+          <button class="btn btn-secondary btn-sm" id="btn-measure" type="button" data-needs-conn>
+            <svg class="i sm"><use href="#i-zap"/></svg><span>Medir ahora</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <div class="card-head"><span class="hic"><svg class="i sm"><use href="#i-batt"/></svg></span><div class="grow"><h3>Batería</h3><p id="batt-kind">Litio AA (L91)</p></div></div>
+          <div class="batt-row">
+            <div class="batt" id="batt-ico" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="big-stat num" id="batt-main">—</div>
+          </div>
+          <dl class="kv" id="batt-kv"></dl>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="hic"><svg class="i sm"><use href="#i-cloud"/></svg></span><div class="grow"><h3>Envío de datos</h3><p id="up-kind">Al servidor por WiFi</p></div><span id="up-badge"></span></div>
+          <div class="big-stat num" id="up-main">—</div>
+          <dl class="kv" id="up-kv"></dl>
+        </div>
+      </div>
+    </section>
+
+    <!-- ----------------------------- Datos ----------------------------- -->
+    <section class="tab" id="tab-datos" role="tabpanel" aria-labelledby="tb-datos" hidden>
+      <div class="toolbar">
+        <div class="seg" role="group" aria-label="Periodo" id="range-seg">
+          <button type="button" data-range="24h" aria-pressed="true">24 h</button>
+          <button type="button" data-range="7d" aria-pressed="false">7 d</button>
+          <button type="button" data-range="30d" aria-pressed="false">30 d</button>
+          <button type="button" data-range="all" aria-pressed="false">Todo</button>
+        </div>
+      </div>
+      <div class="sync" id="sync-row" hidden>
+        <span class="spin"></span><span id="sync-text">Descargando historial…</span><span class="num muted" id="sync-pct"></span>
+        <div class="meter"><i id="sync-bar" style="width:0"></i></div>
+      </div>
+      <div class="stats" id="stats"></div>
+
+      <div class="card" style="padding:0">
+        <div class="chart" id="chart" tabindex="0" role="group" aria-label="Gráfica de temperatura y humedad">
+          <div class="plot-head">
+            <span class="metric-label"><i class="key t"></i>Temperatura <span>°C</span></span>
+            <span class="rng" id="rng-t"></span>
+          </div>
+          <canvas data-plot="t" style="height:150px"></canvas>
+          <div class="plot-head">
+            <span class="metric-label"><i class="key rh"></i>Humedad relativa <span>%</span></span>
+            <span class="rng" id="rng-rh"></span>
+          </div>
+          <canvas data-plot="rh" style="height:174px"></canvas>
+          <div class="chart-foot" id="chart-foot"></div>
+          <div class="tip" id="chart-tip" hidden></div>
+          <div class="empty" id="chart-empty" hidden></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="tbl-head">
+          <h3 id="tbl-title">Lecturas</h3>
+          <div class="tbl-tools">
+            <button class="chip" type="button" id="tbl-only-flags" aria-pressed="false"><svg class="i xs"><use href="#i-alert"/></svg>Solo incidencias</button>
+          </div>
+        </div>
+        <div class="tbl-wrap">
+          <table class="rd">
+            <thead><tr><th scope="col">Fecha</th><th scope="col">Temp.</th><th scope="col">Humedad</th><th scope="col">Batería</th><th scope="col"><span class="sr-only">Estado</span></th></tr></thead>
+            <tbody id="tbl-body"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="tbl-empty" hidden></div>
+        <div class="pager" id="pager">
+          <button class="btn btn-secondary btn-sm" type="button" id="pg-prev"><svg class="i sm"><use href="#i-chev-l"/></svg>Más recientes</button>
+          <span id="pg-info" class="num"></span>
+          <button class="btn btn-secondary btn-sm" type="button" id="pg-next">Anteriores<svg class="i sm"><use href="#i-chev-r"/></svg></button>
+        </div>
+        <div class="row-inline" style="margin-top:14px">
+          <button class="btn btn-primary" style="flex:1" type="button" id="btn-csv"><svg class="i sm"><use href="#i-download"/></svg><span id="btn-csv-text">Exportar CSV</span></button>
+          <button class="btn btn-secondary" type="button" id="btn-share" hidden aria-label="Compartir CSV"><svg class="i sm"><use href="#i-share"/></svg></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- -------------------------- Configuración -------------------------- -->
+    <section class="tab" id="tab-config" role="tabpanel" aria-labelledby="tb-config" hidden>
+      <div id="cfg-loading" class="card empty"><div class="em-ic"><span class="spin"></span></div><b>Leyendo configuración…</b><p>Un momento.</p></div>
+      <form id="cfg-form" novalidate autocomplete="off" hidden>
+        <fieldset id="cfg-fs" style="display:grid;grid-template-columns:minmax(0,1fr);gap:14px">
+          <section class="card">
+            <div class="card-head"><span class="hic"><svg class="i sm"><use href="#i-clock"/></svg></span><div class="grow"><h3>Mediciones</h3><p>Cada cuánto mide y envía datos</p></div></div>
+            <div class="field" data-f="meas_min">
+              <label for="f-meas_min">Medir cada</label>
+              <div class="input"><input id="f-meas_min" name="meas_min" inputmode="numeric" aria-describedby="h-meas_min e-meas_min"><span class="unit">min</span></div>
+              <div class="chips" data-chips="meas_min">
+                <button type="button" class="chip" data-v="5">5 min</button><button type="button" class="chip" data-v="10">10 min</button><button type="button" class="chip" data-v="15">15 min</button><button type="button" class="chip" data-v="30">30 min</button><button type="button" class="chip" data-v="60">1 h</button>
+              </div>
+              <p class="hint" id="h-meas_min">Entre 1 y 255 minutos.</p>
+              <p class="ferr" id="e-meas_min"></p>
+            </div>
+            <div class="field" data-f="upload_min">
+              <label for="f-upload_min">Enviar al servidor cada</label>
+              <div class="input"><input id="f-upload_min" name="upload_min" inputmode="numeric" aria-describedby="h-upload_min e-upload_min"><span class="unit">min</span></div>
+              <div class="chips" data-chips="upload_min">
+                <button type="button" class="chip" data-v="0">No enviar</button><button type="button" class="chip" data-v="60">1 h</button><button type="button" class="chip" data-v="180">3 h</button><button type="button" class="chip" data-v="360">6 h</button><button type="button" class="chip" data-v="720">12 h</button><button type="button" class="chip" data-v="1440">24 h</button>
+              </div>
+              <p class="hint" id="h-upload_min">0 = no enviar (los datos se quedan en el sensor). Si no, entre el intervalo de medición y 1440 min.</p>
+              <p class="ferr" id="e-upload_min"></p>
+            </div>
+            <div class="impact" id="impact" aria-live="polite"></div>
+          </section>
+
+          <section class="card">
+            <div class="card-head"><span class="hic"><svg class="i sm"><use href="#i-wifi"/></svg></span><div class="grow"><h3>Red WiFi</h3><p>Para enviar los datos al servidor</p></div></div>
+            <div class="field" data-f="wifi_ssid">
+              <label for="f-wifi_ssid">Nombre de la red (SSID)</label>
+              <div class="row-inline">
+                <div class="input"><input id="f-wifi_ssid" name="wifi_ssid" autocapitalize="off" spellcheck="false" aria-describedby="e-wifi_ssid"></div>
+                <button class="btn btn-secondary" type="button" id="btn-scan" data-needs-conn><svg class="i sm"><use href="#i-search"/></svg><span>Buscar redes</span></button>
+              </div>
+              <p class="ferr" id="e-wifi_ssid"></p>
+              <div class="scan" id="scan" hidden></div>
+            </div>
+            <div class="field" data-f="wifi_pass">
+              <label for="f-wifi_pass">Contraseña</label>
+              <div class="input"><input id="f-wifi_pass" name="wifi_pass" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false" aria-describedby="h-wifi_pass e-wifi_pass"><button class="ib" type="button" data-reveal="f-wifi_pass" aria-label="Mostrar contraseña"><svg class="i sm"><use href="#i-eye"/></svg></button></div>
+              <p class="hint" id="h-wifi_pass">Solo se envía si escribes una nueva.</p>
+              <p class="ferr" id="e-wifi_pass"></p>
+              <label class="check" id="clr-wifi_pass-row" hidden><input type="checkbox" id="clr-wifi_pass"> Borrar la contraseña guardada (red abierta)</label>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-head"><span class="hic"><svg class="i sm"><use href="#i-server"/></svg></span><div class="grow"><h3>Servidor</h3><p>Dónde se envían las lecturas</p></div></div>
+            <div class="field" data-f="url">
+              <label for="f-url">URL</label>
+              <div class="input"><input id="f-url" name="url" type="url" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://…" aria-describedby="h-url e-url"></div>
+              <p class="hint" id="h-url">Debe empezar por http:// o https://. Máximo 200 caracteres.</p>
+              <p class="ferr" id="e-url"></p>
+            </div>
+            <div class="field" data-f="token">
+              <label for="f-token">Token de acceso</label>
+              <div class="input"><input id="f-token" name="token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="h-token e-token"><button class="ib" type="button" data-reveal="f-token" aria-label="Mostrar token"><svg class="i sm"><use href="#i-eye"/></svg></button></div>
+              <p class="hint" id="h-token">Se envía como «Authorization: Bearer». Solo se envía si escribes uno nuevo.</p>
+              <p class="ferr" id="e-token"></p>
+              <label class="check" id="clr-token-row" hidden><input type="checkbox" id="clr-token"> Borrar el token guardado</label>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-head"><span class="hic"><svg class="i sm"><use href="#i-target"/></svg></span><div class="grow"><h3>Calibración</h3><p>Corrección que se suma a cada lectura</p></div></div>
+            <div class="field" data-f="t_offset">
+              <span class="lbl" id="l-t_offset">Ajuste de temperatura</span>
+              <div class="stepper">
+                <button class="btn btn-secondary" type="button" data-step="t_offset" data-d="-0.1" aria-label="Restar 0,1 °C">−</button>
+                <div class="input"><input id="f-t_offset" name="t_offset" inputmode="decimal" aria-labelledby="l-t_offset" aria-describedby="h-t_offset e-t_offset"><span class="unit">°C</span></div>
+                <button class="btn btn-secondary" type="button" data-step="t_offset" data-d="0.1" aria-label="Sumar 0,1 °C">+</button>
+              </div>
+              <p class="hint" id="h-t_offset">Entre −10 y 10 °C. Si el sensor marca 0,5 °C de más, pon −0,5.</p>
+              <p class="ferr" id="e-t_offset"></p>
+            </div>
+            <div class="field" data-f="rh_offset">
+              <span class="lbl" id="l-rh_offset">Ajuste de humedad</span>
+              <div class="stepper">
+                <button class="btn btn-secondary" type="button" data-step="rh_offset" data-d="-0.5" aria-label="Restar 0,5 %">−</button>
+                <div class="input"><input id="f-rh_offset" name="rh_offset" inputmode="decimal" aria-labelledby="l-rh_offset" aria-describedby="h-rh_offset e-rh_offset"><span class="unit">%</span></div>
+                <button class="btn btn-secondary" type="button" data-step="rh_offset" data-d="0.5" aria-label="Sumar 0,5 %">+</button>
+              </div>
+              <p class="hint" id="h-rh_offset">Entre −20 y 20 puntos de humedad relativa.</p>
+              <p class="ferr" id="e-rh_offset"></p>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-head"><span class="hic"><svg class="i sm"><use href="#i-cog"/></svg></span><div class="grow"><h3>Avanzado</h3><p>Radio, modo configuración y nombre</p></div></div>
+            <div class="field" data-f="tx_power">
+              <label for="f-tx_power">Potencia de transmisión</label>
+              <div class="range-row"><input id="f-tx_power" name="tx_power" type="range" min="2" max="20" step="1" aria-describedby="h-tx_power e-tx_power"><output id="o-tx_power" for="f-tx_power">— dBm</output></div>
+              <p class="hint" id="h-tx_power">Entre 2 y 20 dBm. Menos potencia = picos de corriente menores (mejor para pilas gastadas o con frío), pero menos alcance.</p>
+              <p class="ferr" id="e-tx_power"></p>
+            </div>
+            <div class="field" data-f="cfg_timeout_min">
+              <label for="f-cfg_timeout_min">Tiempo en modo configuración</label>
+              <div class="input"><input id="f-cfg_timeout_min" name="cfg_timeout_min" inputmode="numeric" aria-describedby="h-cfg_timeout_min e-cfg_timeout_min"><span class="unit">min</span></div>
+              <p class="hint" id="h-cfg_timeout_min">Entre 1 y 60 minutos sin actividad antes de que el sensor se apague tras pulsar WAKE.</p>
+              <p class="ferr" id="e-cfg_timeout_min"></p>
+            </div>
+            <div class="field" data-f="name">
+              <label for="f-name">Nombre del sensor</label>
+              <div class="input"><input id="f-name" name="name" maxlength="20" autocapitalize="off" spellcheck="false" aria-describedby="h-name e-name"></div>
+              <p class="hint" id="h-name">De 1 a 20 caracteres: letras sin tildes, números, espacios, «_» o «-».</p>
+              <p class="ferr" id="e-name"></p>
+            </div>
+          </section>
+        </fieldset>
+        <div class="savebar" id="savebar" hidden>
+          <span id="savebar-text">Cambios sin guardar</span>
+          <button class="btn btn-ghost btn-sm" type="button" id="btn-discard">Descartar</button>
+          <button class="btn btn-primary btn-sm" type="submit" id="btn-save" data-needs-conn>Guardar</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ----------------------------- Sistema ----------------------------- -->
+    <section class="tab" id="tab-sistema" role="tabpanel" aria-labelledby="tb-sistema" hidden>
+      <div class="card">
+        <div class="card-head"><span class="hic"><svg class="i sm"><use href="#i-chip"/></svg></span><div class="grow"><h3>Dispositivo</h3><p id="sys-sub">—</p></div></div>
+        <dl class="kv" id="sys-kv" style="margin-top:0"></dl>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span class="hic"><svg class="i sm"><use href="#i-db"/></svg></span><div class="grow"><h3>Memoria de lecturas</h3><p id="mem-sub">—</p></div></div>
+        <div class="meter" id="mem-meter"><i style="width:0"></i></div>
+        <dl class="kv" id="mem-kv"></dl>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span class="hic"><svg class="i sm"><use href="#i-zap"/></svg></span><div class="grow"><h3>Acciones</h3><p>Cada acción mantiene el sensor despierto</p></div></div>
+        <div class="result" id="up-result" hidden></div>
+        <div class="actions-list">
+          <button class="act" type="button" id="act-time" data-needs-conn><span class="hic"><svg class="i sm"><use href="#i-clock"/></svg></span><span><b>Sincronizar hora</b><small>Pone la hora del teléfono en el sensor</small></span><svg class="i sm chev"><use href="#i-chev-r"/></svg></button>
+          <button class="act" type="button" id="act-upload" data-needs-conn><span class="hic"><svg class="i sm"><use href="#i-cloud"/></svg></span><span><b>Probar envío ahora</b><small>Envía lo pendiente al servidor (hasta 30 s)</small></span><svg class="i sm chev"><use href="#i-chev-r"/></svg></button>
+          <button class="act" type="button" id="act-exit" data-needs-conn><span class="hic"><svg class="i sm"><use href="#i-power"/></svg></span><span><b>Salir y apagar</b><small>Termina la configuración y ahorra batería</small></span><svg class="i sm chev"><use href="#i-chev-r"/></svg></button>
+          <button class="act" type="button" id="act-reboot" data-needs-conn><span class="hic"><svg class="i sm"><use href="#i-refresh"/></svg></span><span><b>Reiniciar</b><small>Reinicia el sensor</small></span><svg class="i sm chev"><use href="#i-chev-r"/></svg></button>
+          <button class="act" type="button" id="act-disconnect" data-needs-conn><span class="hic"><svg class="i sm"><use href="#i-unlink"/></svg></span><span><b>Desconectar</b><small>Cierra el Bluetooth; el sensor sigue en configuración</small></span><svg class="i sm chev"><use href="#i-chev-r"/></svg></button>
+          <button class="act danger" type="button" id="act-factory" data-needs-conn><span class="hic"><svg class="i sm"><use href="#i-reset"/></svg></span><span><b>Restablecer de fábrica</b><small>Borra WiFi, servidor, calibración y nombre</small></span><svg class="i sm chev"><use href="#i-chev-r"/></svg></button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span class="hic"><svg class="i sm"><use href="#i-phone"/></svg></span><div class="grow"><h3>Este teléfono</h3><p id="local-sub">—</p></div></div>
+        <dl class="kv" id="local-kv" style="margin-top:0"></dl>
+        <div class="row-inline" style="margin-top:14px;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" type="button" id="btn-other"><svg class="i sm"><use href="#i-bt"/></svg>Conectar otro sensor</button>
+          <button class="btn btn-danger-soft btn-sm" type="button" id="btn-clear-cache"><svg class="i sm"><use href="#i-x"/></svg>Borrar lecturas de este teléfono</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
+
+<dialog id="dlg" aria-labelledby="dlg-title" aria-describedby="dlg-text">
+  <form method="dialog" class="dlg">
+    <h2 id="dlg-title"></h2>
+    <p id="dlg-text"></p>
+    <label class="check" id="dlg-check-row" hidden><input type="checkbox" id="dlg-check"><span><span id="dlg-check-text"></span><small id="dlg-check-hint"></small></span></label>
+    <div class="dlg-actions">
+      <button class="btn btn-ghost" value="cancel" id="dlg-cancel">Cancelar</button>
+      <button class="btn btn-primary" value="ok" id="dlg-ok">Aceptar</button>
+    </div>
+  </form>
+</dialog>
+
+<script id="core">
+/* =========================================================================
+   NÚCLEO DEL PROTOCOLO (sin DOM: se puede probar en node)
+   Contrato: docs/PROTOCOLO.md v1
+   ========================================================================= */
+'use strict';
+
+const PROTO = Object.freeze({
+  SVC:  '4f8a1000-6b1c-4e2d-9a7f-3c5d8e1b2a60',
+  CMD:  '4f8a1001-6b1c-4e2d-9a7f-3c5d8e1b2a60',
+  RSP:  '4f8a1002-6b1c-4e2d-9a7f-3c5d8e1b2a60',
+  DATA: '4f8a1003-6b1c-4e2d-9a7f-3c5d8e1b2a60',
+  VERSION: 1,
+  REC_SIZE: 20,
+  MAX_CMD_BYTES: 512,
+  LOG_MAX: 5000,
+});
+const FLAG = Object.freeze({ TIME_INVALID: 0x01, SENSOR_ERR: 0x02, USB: 0x04, BROWNOUT: 0x08, UPLOAD: 0x10, MANUAL: 0x20 });
+const T_ERR = 0x7FFF, RH_ERR = 0xFFFF;
+
+const TE = new TextEncoder();
+const TD = new TextDecoder('utf-8');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Copia cualquier vista binaria (DataView de una notificación, ArrayBuffer…) a un Uint8Array propio. */
+function toBytes(v) {
+  if (v == null) return new Uint8Array(0);
+  if (v instanceof Uint8Array) return v.slice();
+  if (ArrayBuffer.isView(v)) return new Uint8Array(v.buffer, v.byteOffset, v.byteLength).slice();
+  if (v instanceof ArrayBuffer) return new Uint8Array(v.slice(0));
+  return Uint8Array.from(v);
+}
+function concatBytes(parts, total) {
+  if (total == null) { total = 0; for (const p of parts) total += p.length; }
+  const out = new Uint8Array(total);
+  let o = 0;
+  for (const p of parts) { out.set(p, o); o += p.length; }
+  return out;
+}
+
+class SensorError extends Error {
+  constructor(code, message, extra) {
+    super(message || code);
+    this.name = 'SensorError';
+    this.code = code;
+    if (extra) Object.assign(this, extra);
+  }
+  static fromResponse(m) {
+    return new SensorError(String(m.err || 'error'), m.msg ? String(m.msg) : '', { field: m.field, response: m });
+  }
+}
+
+/* --- Reensamblado de RSP ---------------------------------------------------
+   Cada notificación = [cabecera 1 byte][trozo UTF-8]. Cabecera bit0 = 1 → último.
+   Se concatenan BYTES (no texto) para no romper caracteres UTF-8 multibyte
+   partidos entre fragmentos; se decodifica y parsea una vez completo. */
+class RspReassembler {
+  constructor(maxBytes = 64 * 1024) { this.max = maxBytes; this.errors = 0; this.lastError = null; this.reset(); }
+  reset() { this.parts = []; this.size = 0; }
+  get pending() { return this.size; }
+  /** Añade una notificación. Devuelve el objeto JSON si se completó un mensaje, si no undefined. */
+  push(chunk) {
+    const b = toBytes(chunk);
+    if (b.length === 0) return undefined;
+    const last = (b[0] & 0x01) === 0x01;
+    if (b.length > 1) { this.parts.push(b.subarray(1)); this.size += b.length - 1; }
+    if (this.size > this.max) { this.reset(); this.errors++; this.lastError = 'overflow'; return undefined; }
+    if (!last) return undefined;
+    const all = concatBytes(this.parts, this.size);
+    this.reset();
+    let text = '';
+    try {
+      text = TD.decode(all);
+      const msg = JSON.parse(text);
+      if (msg === null || typeof msg !== 'object' || Array.isArray(msg)) throw new Error('no es un objeto');
+      return msg;
+    } catch (e) {
+      this.errors++; this.lastError = 'bad_json: ' + text.slice(0, 120);
+      return undefined;
+    }
+  }
+}
+
+/** Fragmenta un mensaje como lo haría el firmware (para el simulador y las pruebas). */
+function fragmentMessage(obj, mtu = 185) {
+  const body = TE.encode(typeof obj === 'string' ? obj : JSON.stringify(obj));
+  const per = Math.max(1, mtu - 3 - 1);
+  const out = [];
+  let o = 0;
+  do {
+    const part = body.subarray(o, o + per);
+    o += per;
+    const f = new Uint8Array(part.length + 1);
+    f[0] = o >= body.length ? 0x01 : 0x00;
+    f.set(part, 1);
+    out.push(f);
+  } while (o < body.length);
+  return out;
+}
+
+/* --- Registro binario (20 bytes, little-endian) -------------------------- */
+function decodeRecords(u8) {
+  const n = Math.floor(u8.length / PROTO.REC_SIZE);
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  const out = new Array(n);
+  for (let k = 0; k < n; k++) {
+    const o = k * PROTO.REC_SIZE;
+    const tRaw = dv.getInt16(o + 8, true);
+    const rhRaw = dv.getUint16(o + 10, true);
+    out[k] = {
+      i: dv.getUint32(o, true),
+      ts: dv.getUint32(o + 4, true),
+      t: tRaw === T_ERR ? null : tRaw / 100,
+      rh: rhRaw === RH_ERR ? null : rhRaw / 100,
+      v: dv.getUint16(o + 12, true),
+      vl: dv.getUint16(o + 14, true),
+      f: dv.getUint8(o + 16),
+    };
+  }
+  return { records: out, extra: u8.length - n * PROTO.REC_SIZE };
+}
+function encodeRecord(r) {
+  const b = new Uint8Array(PROTO.REC_SIZE);
+  const dv = new DataView(b.buffer);
+  dv.setUint32(0, r.i >>> 0, true);
+  dv.setUint32(4, r.ts >>> 0, true);
+  dv.setInt16(8, r.t == null ? T_ERR : Math.max(-32768, Math.min(32766, Math.round(r.t * 100))), true);
+  dv.setUint16(10, r.rh == null ? RH_ERR : Math.max(0, Math.min(65534, Math.round(r.rh * 100))), true);
+  dv.setUint16(12, r.v | 0, true);
+  dv.setUint16(14, r.vl | 0, true);
+  dv.setUint8(16, r.f | 0);
+  return b;
+}
+/** Decodifica todas las notificaciones DATA de un `log`.
+    Si el total es múltiplo de 20 se decodifica como un flujo continuo; si no,
+    cada notificación por separado (así un paquete corrupto no desalinea el resto).
+    Descarta índices fuera de [lo, hi) y duplicados. */
+function decodeDataChunks(chunks, lo, hi) {
+  let total = 0;
+  for (const c of chunks) total += c.length;
+  let recs = [];
+  let extra = 0;
+  if (total % PROTO.REC_SIZE === 0) {
+    recs = decodeRecords(concatBytes(chunks, total)).records;
+  } else {
+    for (const c of chunks) {
+      const d = decodeRecords(c);
+      extra += d.extra;
+      for (const r of d.records) recs.push(r);
+    }
+  }
+  const byIdx = new Map();
+  let outOfRange = 0;
+  for (const r of recs) {
+    if (lo != null && hi != null && (r.i < lo || r.i >= hi)) { outOfRange++; continue; }
+    byIdx.set(r.i, r);
+  }
+  const records = Array.from(byIdx.values()).sort((a, b) => a.i - b.i);
+  return { records, raw: recs.length, bytes: total, extra, outOfRange, dupes: recs.length - outOfRange - records.length };
+}
+
+function hasSensorError(r) { return (r.f & FLAG.SENSOR_ERR) !== 0 || r.t == null || r.rh == null; }
+function hasTimeInvalid(r) { return (r.f & FLAG.TIME_INVALID) !== 0; }
+
+/* --- Tiempos de espera por comando --------------------------------------- */
+function timeoutFor(cmd, params) {
+  switch (cmd) {
+    case 'wifi_scan': return 15000;
+    case 'upload_now': return 45000;
+    case 'factory_reset': return 45000; // con erase_log puede tardar ~30 s
+    case 'log': {
+      const n = Math.min(PROTO.LOG_MAX, Number((params && (params.count != null ? params.count : params.last)) || 1000));
+      return 10000 + n * 15; // ~15 ms/registro en el peor caso (MTU 23) + margen
+    }
+    default: return 10000;
+  }
+}
+
+/* --- Cliente: cola serializada, ids, tiempos de espera, eventos, DATA ----- */
+class SensorClient {
+  constructor(transport) {
+    this.t = transport;
+    this.queue = [];
+    this.inflight = null;
+    this.connected = false;
+    this.nextId = 1 + Math.floor(Math.random() * 9000);
+    this.handlers = new Map();
+    this.reasm = new RspReassembler();
+    this.stats = { stray: 0, strayData: 0, badRsp: 0 };
+    this.lastDataAt = 0;
+    this.quietAfterLog = false;
+    transport.onRsp = (b) => this._onRsp(b);
+    transport.onData = (b) => this._onData(b);
+    transport.onDisconnect = () => this._onDisconnect();
+  }
+  on(name, fn) {
+    if (!this.handlers.has(name)) this.handlers.set(name, new Set());
+    this.handlers.get(name).add(fn);
+    return () => this.handlers.get(name).delete(fn);
+  }
+  emit(name, arg) {
+    const hs = this.handlers.get(name);
+    if (hs) for (const fn of Array.from(hs)) { try { fn(arg); } catch (e) { console.error(e); } }
+  }
+  async connect() {
+    this.reasm.reset();
+    await this.t.connect();
+    this.reasm.reset();
+    this.connected = true;
+    this.emit('connect');
+  }
+  disconnect() { this.t.disconnect(); }
+  get busy() { return !!this.inflight || this.queue.length > 0; }
+
+  /** Envía un comando y espera su respuesta. Reintenta `busy` automáticamente. */
+  async request(cmd, params = {}, opts = {}) {
+    const retries = opts.busyRetries != null ? opts.busyRetries : 2;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this._enqueue(cmd, params, opts);
+      } catch (e) {
+        if (e && e.code === 'busy' && attempt < retries) { await sleep(1500); continue; }
+        throw e;
+      }
+    }
+  }
+  _enqueue(cmd, params, opts) {
+    return new Promise((resolve, reject) => {
+      if (!this.connected) { reject(new SensorError('disconnected', 'No hay conexión con el sensor')); return; }
+      this.queue.push({ cmd, params: params || {}, opts: opts || {}, resolve, reject });
+      this._pump();
+    });
+  }
+  _nextId() { const id = this.nextId; this.nextId = this.nextId >= 2000000000 ? 1 : this.nextId + 1; return id; }
+
+  async _pump() {
+    if (this.inflight || !this.queue.length || !this.connected) return;
+    // Tras un `log` fallido pueden seguir llegando DATA tardíos: esperar a que se calme el canal.
+    if (this.quietAfterLog) {
+      const quiet = Date.now() - this.lastDataAt;
+      if (quiet < 800) { setTimeout(() => this._pump(), 820 - quiet); return; }
+      this.quietAfterLog = false;
+    }
+    const job = this.queue.shift();
+    job.id = this._nextId();
+    this.inflight = job;
+    if (job.cmd === 'log') {
+      job.chunks = [];
+      job.bytes = 0;
+      if (job.params.from != null && job.params.count != null) { job.lo = job.params.from; job.hi = job.params.from + job.params.count; }
+    }
+    const payload = Object.assign({ id: job.id, cmd: job.cmd }, job.params);
+    const bytes = TE.encode(JSON.stringify(payload));
+    if (bytes.length > PROTO.MAX_CMD_BYTES) {
+      this._finish(job, new SensorError('too_long', 'La petición supera 512 bytes'));
+      return;
+    }
+    this._arm(job, job.opts.timeout || timeoutFor(job.cmd, job.params));
+    try {
+      await this.t.write(bytes);
+    } catch (e) {
+      const msg = String((e && e.message) || e);
+      const code = (e && e.code === 'disconnected') || /disconnect|not connected/i.test(msg) ? 'disconnected' : 'write_fail';
+      this._finish(job, new SensorError(code, msg));
+    }
+  }
+  _arm(job, ms) {
+    clearTimeout(job.timer);
+    job.deadline = Date.now() + ms;
+    job.timer = setTimeout(() => {
+      if (job.cmd === 'log') this.quietAfterLog = true;
+      this._finish(job, new SensorError('timeout', 'El sensor no respondió a tiempo'));
+    }, ms);
+  }
+  _finish(job, err, value) {
+    if (this.inflight !== job) return;
+    clearTimeout(job.timer);
+    this.inflight = null;
+    if (err) job.reject(err); else job.resolve(value);
+    setTimeout(() => this._pump(), 0);
+  }
+  _onRsp(chunk) {
+    const msg = this.reasm.push(chunk);
+    if (msg === undefined) { if (this.reasm.lastError) { this.stats.badRsp = this.reasm.errors; } return; }
+    this._onMessage(msg);
+  }
+  _onMessage(m) {
+    if (typeof m.evt === 'string') {
+      this.emit('event', m);
+      this.emit('evt:' + m.evt, m);
+      return;
+    }
+    const job = this.inflight;
+    if (!job || m.id !== job.id) { this.stats.stray++; return; }
+    if (m.ok === false || (m.ok !== true && m.err)) { this._finish(job, SensorError.fromResponse(m)); return; }
+    if (job.cmd === 'log') {
+      const d = decodeDataChunks(job.chunks, job.lo, job.hi);
+      const sent = Number(m.sent) || 0;
+      m.records = d.records;
+      m.decoded = d.records.length;
+      m.countOk = d.records.length === sent;
+      m.diag = { raw: d.raw, bytes: d.bytes, extra: d.extra, outOfRange: d.outOfRange, dupes: d.dupes };
+      if (d.outOfRange || d.extra) this.quietAfterLog = true;
+    }
+    this._finish(job, null, m);
+  }
+  _onData(chunk) {
+    this.lastDataAt = Date.now();
+    const job = this.inflight;
+    if (!job || job.cmd !== 'log') { this.stats.strayData++; return; }
+    const b = toBytes(chunk);
+    job.chunks.push(b);
+    job.bytes += b.length;
+    // Mientras sigan llegando datos, el plazo no vence.
+    if (job.deadline - Date.now() < 10000) this._arm(job, 10000);
+    if (job.opts.onProgress) { try { job.opts.onProgress(Math.floor(job.bytes / PROTO.REC_SIZE)); } catch (e) { /* nada */ } }
+  }
+  _onDisconnect() {
+    const wasConnected = this.connected;
+    this.connected = false;
+    const jobs = [];
+    if (this.inflight) jobs.push(this.inflight);
+    for (const j of this.queue) jobs.push(j);
+    this.inflight = null;
+    this.queue = [];
+    for (const job of jobs) {
+      clearTimeout(job.timer);
+      if (job.opts.disconnectOk) job.resolve({ ok: true, disconnected: true });
+      else job.reject(new SensorError('disconnected', 'Se perdió la conexión'));
+    }
+    this.reasm.reset();
+    if (wasConnected || jobs.length) this.emit('disconnect');
+  }
+}
+
+/* --- Transporte Web Bluetooth -------------------------------------------- */
+function withTimeout(p, ms, code) {
+  let t;
+  return Promise.race([
+    p.finally(() => clearTimeout(t)),
+    new Promise((_, rej) => { t = setTimeout(() => rej(new SensorError(code || 'timeout', 'Tiempo de espera agotado')), ms); }),
+  ]);
+}
+async function retryGatt(fn, tries = 3) {
+  for (let k = 0; ; k++) {
+    try { return await fn(); }
+    catch (e) {
+      const m = String((e && e.message) || e);
+      if (k + 1 >= tries || !/in progress|unknown reason|GATT operation failed|NetworkError/i.test(m)) throw e;
+      await sleep(150 * (k + 1));
+    }
+  }
+}
+
+class BleTransport {
+  constructor() {
+    this.kind = 'ble';
+    this.device = null;
+    this.cmd = this.rsp = this.data = null;
+    this.onRsp = this.onData = this.onDisconnect = null;
+    this._onDisc = () => { if (this.onDisconnect) this.onDisconnect(); };
+    this._onRspEv = (e) => { if (this.onRsp) this.onRsp(e.target.value); };
+    this._onDataEv = (e) => { if (this.onData) this.onData(e.target.value); };
+  }
+  static supported() {
+    return typeof navigator !== 'undefined' && !!navigator.bluetooth && typeof navigator.bluetooth.requestDevice === 'function';
+  }
+  get name() { return (this.device && this.device.name) || ''; }
+  get id() { return (this.device && this.device.id) || ''; }
+  async choose() {
+    const dev = await navigator.bluetooth.requestDevice({ filters: [{ services: [PROTO.SVC] }] });
+    if (this.device && this.device !== dev) this.device.removeEventListener('gattserverdisconnected', this._onDisc);
+    this.device = dev;
+    dev.removeEventListener('gattserverdisconnected', this._onDisc);
+    dev.addEventListener('gattserverdisconnected', this._onDisc);
+  }
+  async connect() {
+    if (!this.device) await this.choose();
+    const gatt = this.device.gatt;
+    let server;
+    try {
+      server = await withTimeout(gatt.connect(), 20000, 'connect_timeout');
+    } catch (e) {
+      try { gatt.disconnect(); } catch (_) { /* nada */ }
+      throw e;
+    }
+    const svc = await retryGatt(() => server.getPrimaryService(PROTO.SVC));
+    const cmd = await retryGatt(() => svc.getCharacteristic(PROTO.CMD));
+    const rsp = await retryGatt(() => svc.getCharacteristic(PROTO.RSP));
+    const data = await retryGatt(() => svc.getCharacteristic(PROTO.DATA));
+    this._unbind();
+    this.cmd = cmd; this.rsp = rsp; this.data = data;
+    rsp.addEventListener('characteristicvaluechanged', this._onRspEv);
+    data.addEventListener('characteristicvaluechanged', this._onDataEv);
+    // Una operación GATT a la vez: activar notificaciones en secuencia.
+    await retryGatt(() => rsp.startNotifications());
+    await retryGatt(() => data.startNotifications());
+  }
+  _unbind() {
+    if (this.rsp) this.rsp.removeEventListener('characteristicvaluechanged', this._onRspEv);
+    if (this.data) this.data.removeEventListener('characteristicvaluechanged', this._onDataEv);
+  }
+  async write(bytes) {
+    for (let attempt = 0; ; attempt++) {
+      if (!this.device || !this.device.gatt.connected || !this.cmd) throw new SensorError('disconnected', 'No conectado');
+      try {
+        if (typeof this.cmd.writeValueWithResponse === 'function') await this.cmd.writeValueWithResponse(bytes);
+        else await this.cmd.writeValue(bytes);
+        return;
+      } catch (e) {
+        const m = String((e && e.message) || e);
+        if (/in progress/i.test(m) && attempt < 6) { await sleep(60 * (attempt + 1)); continue; }
+        throw e;
+      }
+    }
+  }
+  disconnect() {
+    try { if (this.device && this.device.gatt.connected) this.device.gatt.disconnect(); } catch (e) { /* nada */ }
+  }
+}
+
+/* =========================================================================
+   SIMULADOR (modo demo): emula el firmware a nivel de bytes — RSP fragmentado
+   y registros DATA binarios — para que la app recorra el mismo camino que
+   con el sensor real.
+   ========================================================================= */
+const DEMO_EPOCH = 1767225600; // 2026-01-01T00:00:00Z
+const DEMO_STEP = 900;         // 15 min
+
+function h32(n) {
+  n = Math.imul((n ^ 0x9e3779b9) >>> 0, 0x85ebca6b);
+  n ^= n >>> 13; n = Math.imul(n, 0xc2b2ae35); n ^= n >>> 16;
+  return (n >>> 0) / 4294967296;
+}
+function vnoise(x, seed) {
+  const i = Math.floor(x), f = x - i;
+  const a = h32(i * 7919 + seed * 104729), b = h32((i + 1) * 7919 + seed * 104729);
+  const u = (1 - Math.cos(f * Math.PI)) / 2;
+  return a + (b - a) * u;
+}
+function demoClimate(ts) {
+  const d = new Date(ts * 1000);
+  const hour = d.getHours() + d.getMinutes() / 60;
+  const day = ts / 86400;
+  const front = (vnoise(day / 3.2, 11) - 0.5) * 6.5 + (vnoise(day / 0.8, 23) - 0.5) * 1.8;
+  const amp = 2.6 + vnoise(day, 31) * 3.2;               // días nublados vs soleados
+  const diurnal = Math.cos(((hour - 15) / 24) * 2 * Math.PI); // máximo ~15:00
+  const jitter = (h32(Math.floor(ts / 60)) - 0.5) * 0.22;
+  const t = 19.2 + front + amp * diurnal + jitter;
+  const rhBase = 70 - front * 1.7 + (vnoise(day / 2.1, 47) - 0.5) * 12;
+  const rh = Math.max(24, Math.min(97, rhBase - amp * 2.7 * diurnal + (h32(Math.floor(ts / 60) + 5) - 0.5) * 0.9));
+  return { t, rh };
+}
+
+class DemoSensor {
+  constructor() {
+    this.mac = '90:64:9b:de:4d:01';
+    this.fw = '1.0.0';
+    this.capacity = 195840;
+    this.defaults = { name: 'Humedad-4D01', meas_min: 15, upload_min: 60, wifi_ssid: '', wifi_pass: '', url: '', token: '', t_offset: 0, rh_offset: 0, tx_power: 15, cfg_timeout_min: 10 };
+    this.cfg = Object.assign({}, this.defaults, {
+      wifi_ssid: 'Finca La Esperanza', wifi_pass: 'cafe-2026', url: 'https://datos.ejemplo.com/api/lecturas', token: 'demo-token',
+    });
+    this.clockOffset = -37;      // reloj desviado: la app debe sincronizarlo
+    this.timeValid = true;
+    const now = this.idxNow();
+    this.first = now - 30 * 96 + 1;
+    this.lastEmitted = now;
+    const upIdx = now - (((now % 4) + 4) % 4);       // último ciclo con subida
+    this.lastUploadIdx = upIdx + 1;                  // primer registro aún no subido
+    this.lastUp = { ts: this.tsOf(upIdx) + 22, code: 200, err: '', sent: 4 };
+    this.brownouts = 1;
+    this.bootAt = Date.now() - 2500;
+    this.lastCmdAt = Date.now();
+    this.mtu = 185;
+    this.busy = false;
+    this.port = null;
+    this.tx = Promise.resolve();
+    this.timer = null;
+  }
+  realNow() { return Date.now() / 1000; }
+  now() { return Math.floor(this.realNow() + this.clockOffset); }
+  idxNow() { return Math.floor((this.realNow() - 40 - DEMO_EPOCH) / DEMO_STEP); }
+  get next() { return this.idxNow() + 1; }
+  tsOf(i) { return DEMO_EPOCH + i * DEMO_STEP + Math.floor(h32(i) * 25); }
+  damaged(i) { return ((i % 1531) + 1531) % 1531 === 777; }
+  battAt(i, t) {
+    const age = ((i % 35040) + 35040) % 35040;   // pila nueva cada año
+    return Math.round(1640 - age * 0.0062 + (t - 20) * 0.7 + (h32(i + 99) - 0.5) * 4);
+  }
+  recOf(i) {
+    if (this.damaged(i)) return null;
+    let ts = this.tsOf(i);
+    const c = demoClimate(ts);
+    let f = 0, t = Math.round(c.t * 100) / 100, rh = Math.round(c.rh * 100) / 100;
+    const v = this.battAt(i, c.t);
+    let vl = 0;
+    if (i % 1009 === 500) { f |= FLAG.SENSOR_ERR; t = null; rh = null; }
+    if (i % 2017 === 1199) { f |= FLAG.TIME_INVALID; ts = 3600 + (i % 97) * 900; }
+    if (i % 2017 === 1200) f |= FLAG.BROWNOUT;
+    if (i % 4 === 0) { f |= FLAG.UPLOAD; vl = v - 118 - Math.round(h32(i + 7) * 40); }
+    return { i, ts, t, rh, v, vl, f };
+  }
+  countValid(a, b) {
+    let n = b - a;
+    for (let k = a; k < b; k++) if (this.damaged(k)) n--;
+    return n;
+  }
+  publicCfg() {
+    const c = Object.assign({}, this.cfg);
+    c.wifi_pass_set = !!c.wifi_pass; c.token_set = !!c.token;
+    delete c.wifi_pass; delete c.token;
+    return c;
+  }
+  attach(port) {
+    this.port = port;
+    this.lastCmdAt = Date.now();
+    this.bootAt = Math.min(this.bootAt, Date.now() - 2500);
+    clearInterval(this.timer);
+    this.timer = setInterval(() => this._tick(), 1000);
+  }
+  detach() { this.port = null; clearInterval(this.timer); this.timer = null; }
+  remaining() { return Math.max(0, Math.round(this.cfg.cfg_timeout_min * 60 - (Date.now() - this.lastCmdAt) / 1000)); }
+  _tick() {
+    if (!this.port) return;
+    if (this.remaining() <= 0) {
+      this._send({ evt: 'bye', reason: 'timeout' }).then(() => setTimeout(() => this.port && this.port._drop(), 250));
+      clearInterval(this.timer);
+      return;
+    }
+    const idx = this.idxNow();
+    while (this.lastEmitted < idx) {
+      this.lastEmitted++;
+      const r = this.recOf(this.lastEmitted);
+      if (r) this._send({ evt: 'reading', i: r.i, ts: r.ts, t: r.t, rh: r.rh, batt_mv: r.v });
+      if (this.lastEmitted % 4 === 0 && this.cfg.upload_min > 0 && this.cfg.wifi_ssid && this.cfg.url) {
+        const upTo = this.lastEmitted + 1;
+        const pend = this.countValid(Math.max(this.first, this.lastUploadIdx), upTo);
+        setTimeout(() => {
+          this.lastUploadIdx = upTo;
+          this.lastUp = { ts: this.now(), code: 200, err: '', sent: pend };
+          this._send({ evt: 'upload', code: 200, sent: pend, err: '' });
+        }, 3000);
+      }
+    }
+  }
+  /** Cola de transmisión: los fragmentos de mensajes distintos nunca se intercalan. */
+  _send(obj, dataPackets) {
+    const port = this.port;
+    this.tx = this.tx.then(async () => {
+      if (!port || !port.connected) return;
+      if (dataPackets) {
+        for (let k = 0; k < dataPackets.length; k++) {
+          if (!port.connected) return;
+          port._notifyData(dataPackets[k]);
+          if (k % 12 === 11) await sleep(6);
+        }
+      }
+      for (const fr of fragmentMessage(obj, this.mtu)) {
+        if (!port.connected) return;
+        port._notifyRsp(fr);
+        await sleep(2);
+      }
+    }).catch((e) => console.error(e));
+    return this.tx;
+  }
+  receive(bytes) {
+    let req;
+    try { req = JSON.parse(TD.decode(bytes)); } catch (e) { this._send({ ok: false, err: 'bad_json', msg: 'JSON no válido' }); return; }
+    const id = req.id;
+    this.lastCmdAt = Date.now();
+    if (this.busy) { this._send({ id, ok: false, err: 'busy', msg: 'Ocupado' }); return; }
+    this.busy = true;
+    this._handle(req).then((res) => {
+      this.busy = false;
+      if (!res) return;
+      const out = Object.assign({ id }, res.body);
+      return this._send(out, res.data).then(() => res.after && res.after());
+    }).catch((e) => {
+      this.busy = false;
+      this._send({ id, ok: false, err: 'internal', msg: String(e && e.message || e) });
+    });
+  }
+  async _handle(req) {
+    const ok = (o) => ({ body: Object.assign({ ok: true }, o) });
+    const fail = (err, msg, extra) => ({ body: Object.assign({ ok: false, err, msg }, extra || {}) });
+    await sleep(90 + Math.random() * 160);
+    switch (req.cmd) {
+      case 'hello':
+        return ok({ fw: this.fw, proto: 1, name: this.cfg.name, mac: this.mac, log_capacity: this.capacity });
+      case 'status': {
+        const now = this.now();
+        const nx = this.next;
+        const live = demoClimate(this.realNow());
+        const lastIdx = nx - 1;
+        const uploadsOn = this.cfg.upload_min > 0 && this.cfg.wifi_ssid && this.cfg.url;
+        const up = this.lastUp;
+        return ok({
+          now, time_valid: this.timeValid, mode: 'config', cfg_remaining_s: this.remaining(),
+          usb: false, batt_mv: this.battAt(lastIdx, live.t), batt_present: true,
+          chip_t: Math.round((live.t + 4.6) * 10) / 10,
+          last: { ts: this.tsOf(lastIdx), t: Math.round((live.t + this.cfg.t_offset) * 100) / 100, rh: Math.round((live.rh + this.cfg.rh_offset) * 10) / 10 },
+          log: { count: this.countValid(this.first, nx), first: this.first, next: nx, pending: this.countValid(Math.max(this.first, this.lastUploadIdx), nx), capacity: this.capacity },
+          upload: up.ts
+            ? { last_try: up.ts, last_ok: up.code >= 200 && up.code < 300 ? up.ts : 0, code: up.code, err: up.err, sent: up.sent, next_due: uploadsOn ? up.ts + this.cfg.upload_min * 60 : 0 }
+            : { last_try: 0, last_ok: 0, code: 0, err: '', sent: 0, next_due: 0 },
+          wake: 'button', reset: 'DEEPSLEEP', uptime_s: Math.round((Date.now() - this.bootAt) / 1000), brownouts: this.brownouts,
+        });
+      }
+      case 'measure': {
+        await sleep(700);
+        const c = demoClimate(this.realNow());
+        return ok({ ts: this.now(), t: Math.round((c.t + this.cfg.t_offset + (Math.random() - 0.5) * 0.1) * 100) / 100, rh: Math.round((c.rh + this.cfg.rh_offset + (Math.random() - 0.5) * 0.4) * 10) / 10, batt_mv: this.battAt(this.idxNow(), c.t) });
+      }
+      case 'get_config':
+        return ok({ cfg: this.publicCfg() });
+      case 'set_config': {
+        const c = req.cfg;
+        if (!c || typeof c !== 'object') return fail('invalid', 'cfg ausente', { field: 'cfg' });
+        const merged = Object.assign({}, this.cfg);
+        const isInt = (v) => Number.isInteger(v);
+        const checks = {
+          name: (v) => typeof v === 'string' && /^[A-Za-z0-9 _-]{1,20}$/.test(v),
+          meas_min: (v) => isInt(v) && v >= 1 && v <= 255,
+          upload_min: (v) => isInt(v) && (v === 0 || (v >= (c.meas_min != null ? c.meas_min : merged.meas_min) && v <= 1440)),
+          wifi_ssid: (v) => typeof v === 'string' && TE.encode(v).length <= 32,
+          wifi_pass: (v) => typeof v === 'string' && TE.encode(v).length <= 64,
+          url: (v) => typeof v === 'string' && v.length <= 200 && (v === '' || /^https?:\/\//.test(v)),
+          token: (v) => typeof v === 'string' && v.length <= 128,
+          t_offset: (v) => typeof v === 'number' && v >= -10 && v <= 10,
+          rh_offset: (v) => typeof v === 'number' && v >= -20 && v <= 20,
+          tx_power: (v) => isInt(v) && v >= 2 && v <= 20,
+          cfg_timeout_min: (v) => isInt(v) && v >= 1 && v <= 60,
+        };
+        for (const k of Object.keys(c)) {
+          if (!checks[k]) continue;
+          if (!checks[k](c[k])) return fail('invalid', 'Valor no válido', { field: k });
+          merged[k] = c[k];
+        }
+        if (merged.upload_min !== 0 && merged.upload_min < merged.meas_min) return fail('invalid', 'upload_min < meas_min', { field: 'upload_min' });
+        await sleep(250);
+        this.cfg = merged;
+        return ok({ cfg: this.publicCfg() });
+      }
+      case 'set_time': {
+        if (typeof req.ts !== 'number' || req.ts < 1600000000) return fail('invalid', 'ts', { field: 'ts' });
+        this.clockOffset = req.ts - this.realNow();
+        this.timeValid = true;
+        return ok({ now: this.now() });
+      }
+      case 'log': {
+        const nx = this.next;
+        let from, to;
+        if (req.last != null) {
+          const n = Number(req.last);
+          if (!Number.isInteger(n) || n < 1 || n > PROTO.LOG_MAX) return fail('invalid', 'last', { field: 'last' });
+          from = Math.max(this.first, nx - n); to = nx;
+        } else {
+          const f0 = Number(req.from), n = Number(req.count);
+          if (!Number.isInteger(f0) || f0 < 0) return fail('invalid', 'from', { field: 'from' });
+          if (!Number.isInteger(n) || n < 1 || n > PROTO.LOG_MAX) return fail('invalid', 'count', { field: 'count' });
+          from = Math.max(this.first, f0); to = Math.min(nx, f0 + n);
+        }
+        const per = Math.max(1, Math.floor((this.mtu - 3) / PROTO.REC_SIZE));
+        const packets = [];
+        let cur = [], sent = 0, lastSent = -1;
+        for (let i = from; i < to; i++) {
+          const r = this.recOf(i);
+          if (!r) continue;
+          cur.push(encodeRecord(r)); sent++; lastSent = i;
+          if (cur.length === per) { packets.push(concatBytes(cur)); cur = []; }
+        }
+        if (cur.length) packets.push(concatBytes(cur));
+        return { body: { ok: true, sent, from, next: lastSent >= 0 ? lastSent + 1 : Math.max(from, to) }, data: packets };
+      }
+      case 'wifi_scan': {
+        await sleep(2400 + Math.random() * 900);
+        const j = () => Math.round((Math.random() - 0.5) * 6);
+        return ok({ aps: [
+          { ssid: 'Finca La Esperanza', rssi: -58 + j(), ch: 6, secure: true },
+          { ssid: 'Invernadero_2', rssi: -71 + j(), ch: 1, secure: true },
+          { ssid: 'Casa Peña 2.4G', rssi: -66 + j(), ch: 11, secure: true },
+          { ssid: 'Finca La Esperanza', rssi: -81 + j(), ch: 6, secure: true },
+          { ssid: '', rssi: -74 + j(), ch: 3, secure: true },
+          { ssid: 'Bodega-Café', rssi: -84 + j(), ch: 9, secure: false },
+          { ssid: 'MOVISTAR_8F21', rssi: -89 + j(), ch: 1, secure: true },
+          { ssid: 'Invitados', rssi: -77 + j(), ch: 6, secure: false },
+        ] });
+      }
+      case 'upload_now': {
+        if (!this.cfg.wifi_ssid || !this.cfg.url) return fail('no_wifi_config', 'Falta WiFi o URL');
+        await sleep(2600 + Math.random() * 900);
+        const nx = this.next;
+        const pend = this.countValid(Math.max(this.first, this.lastUploadIdx), nx);
+        this.lastUploadIdx = nx;
+        this.lastUp = { ts: this.now(), code: 200, err: '', sent: pend };
+        return ok({ code: 200, sent: pend, ms: 1900 + Math.round(Math.random() * 700), err: '' });
+      }
+      case 'exit':
+        return { body: { ok: true }, after: () => this._send({ evt: 'bye', reason: 'exit' }).then(() => setTimeout(() => this.port && this.port._drop(), 300)) };
+      case 'reboot':
+        return { body: { ok: true }, after: () => setTimeout(() => { this.bootAt = Date.now() + 1500; this.port && this.port._drop(); }, 300) };
+      case 'factory_reset': {
+        await sleep(400);
+        this.cfg = Object.assign({}, this.defaults);
+        if (req.erase_log) { this.first = this.next; this.lastUploadIdx = this.first; }
+        return ok({});
+      }
+      default:
+        return fail('unknown_cmd', 'Comando desconocido: ' + req.cmd);
+    }
+  }
+}
+
+class DemoTransport {
+  constructor(sensor) {
+    this.kind = 'demo';
+    this.sensor = sensor;
+    this.connected = false;
+    this.onRsp = this.onData = this.onDisconnect = null;
+  }
+  get name() { return this.sensor.cfg.name; }
+  get id() { return 'demo'; }
+  async connect() {
+    await sleep(650);
+    this.connected = true;
+    this.sensor.attach(this);
+  }
+  async write(bytes) {
+    if (!this.connected) throw new SensorError('disconnected', 'No conectado');
+    if (bytes.length > PROTO.MAX_CMD_BYTES) throw new Error('Valor demasiado largo (> 512 bytes)');
+    await sleep(10);
+    this.sensor.receive(toBytes(bytes));
+  }
+  disconnect() { this._drop(); }
+  _drop() {
+    if (!this.connected) return;
+    this.connected = false;
+    this.sensor.detach();
+    setTimeout(() => this.onDisconnect && this.onDisconnect(), 0);
+  }
+  _notifyRsp(u8) { if (this.connected && this.onRsp) this.onRsp(new DataView(u8.buffer, u8.byteOffset, u8.byteLength)); }
+  _notifyData(u8) { if (this.connected && this.onData) this.onData(new DataView(u8.buffer, u8.byteOffset, u8.byteLength)); }
+}
+
+/* --- Caché local de lecturas (IndexedDB con respaldo en memoria) ---------- */
+class LogStore {
+  constructor() { this.kind = 'mem'; this.db = null; this.mem = new Map(); }
+  async open() {
+    try {
+      if (typeof indexedDB === 'undefined' || !indexedDB) throw new Error('sin IndexedDB');
+      this.db = await withTimeout(new Promise((res, rej) => {
+        const r = indexedDB.open('sensor-humedad', 1);
+        r.onupgradeneeded = () => {
+          const db = r.result;
+          if (!db.objectStoreNames.contains('rec')) db.createObjectStore('rec', { keyPath: ['m', 'i'] });
+        };
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+        r.onblocked = () => rej(new Error('IndexedDB bloqueada'));
+      }), 4000, 'idb_timeout');
+      this.kind = 'idb';
+    } catch (e) {
+      this.db = null; this.kind = 'mem';
+    }
+    return this.kind;
+  }
+  _mem(mac) { if (!this.mem.has(mac)) this.mem.set(mac, new Map()); return this.mem.get(mac); }
+  _range(mac) { return IDBKeyRange.bound([mac, -Infinity], [mac, Infinity]); }
+  _fallback(e) { console.warn('IndexedDB no disponible, uso memoria:', e); this.kind = 'mem'; this.db = null; }
+  _tx(mode, fn) {
+    return new Promise((res, rej) => {
+      const tx = this.db.transaction('rec', mode);
+      const st = tx.objectStore('rec');
+      let out;
+      try { out = fn(st); } catch (e) { rej(e); return; }
+      tx.oncomplete = () => res(out && out.result !== undefined && out.readyState ? out.result : out);
+      tx.onerror = () => rej(tx.error);
+      tx.onabort = () => rej(tx.error || new Error('abort'));
+    });
+  }
+  async getAll(mac) {
+    if (this.kind === 'idb') {
+      try {
+        const rows = await this._tx('readonly', (st) => st.getAll(this._range(mac)));
+        const out = rows.map((r) => ({ i: r.i, ts: r.ts, t: r.t, rh: r.rh, v: r.v, vl: r.vl, f: r.f }));
+        out.sort((a, b) => a.i - b.i);
+        return out;
+      } catch (e) { this._fallback(e); }
+    }
+    return Array.from(this._mem(mac).values()).sort((a, b) => a.i - b.i);
+  }
+  async putMany(mac, recs) {
+    const m = this._mem(mac);
+    if (this.kind !== 'idb') { for (const r of recs) m.set(r.i, r); return; }
+    try {
+      await this._tx('readwrite', (st) => { for (const r of recs) st.put({ m: mac, i: r.i, ts: r.ts, t: r.t, rh: r.rh, v: r.v, vl: r.vl, f: r.f }); });
+    } catch (e) { this._fallback(e); for (const r of recs) m.set(r.i, r); }
+  }
+  async clear(mac) {
+    this.mem.delete(mac);
+    if (this.kind !== 'idb') return;
+    try { await this._tx('readwrite', (st) => st.delete(this._range(mac))); } catch (e) { this._fallback(e); }
+  }
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { PROTO, FLAG, RspReassembler, fragmentMessage, decodeRecords, encodeRecord, decodeDataChunks, SensorClient, SensorError, DemoSensor, DemoTransport, LogStore, timeoutFor, demoClimate };
+}
+</script>
+<script id="app">
+'use strict';
+(() => {
+const APP_VERSION = '1.0.0';
+const NS = 'http://www.w3.org/2000/svg';
+
+/* =========================================================================
+   Utilidades
+   ========================================================================= */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  if (attrs) for (const k of Object.keys(attrs)) {
+    const v = attrs[k];
+    if (v == null || v === false) continue;
+    if (k === 'class') el.className = v;
+    else if (k === 'text') el.textContent = v;
+    else if (k === 'style') el.style.cssText = v;
+    else if (k.slice(0, 2) === 'on') el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of kids.flat(3)) if (c != null && c !== false) el.append(c.nodeType ? c : String(c));
+  return el;
+}
+function icon(id, cls) {
+  const s = document.createElementNS(NS, 'svg');
+  s.setAttribute('class', cls || 'i sm');
+  s.setAttribute('aria-hidden', 'true');
+  const u = document.createElementNS(NS, 'use');
+  u.setAttribute('href', '#' + id);
+  s.appendChild(u);
+  return s;
+}
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const validTs = (ts) => typeof ts === 'number' && ts > 1.5e9;
+const nowS = () => Date.now() / 1000;
+function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+function normMac(m) { return typeof m === 'string' && m ? m.toLowerCase().replace(/[^0-9a-f]/g, '') : ''; }
+function prettyMac(m) { const s = normMac(m); return s.length === 12 ? s.match(/../g).join(':').toUpperCase() : (m || '—'); }
+
+/* --- Formato español (coma decimal, hora local del teléfono) --- */
+const LOC = 'es-ES';
+const NFc = {};
+function nf(d) { return NFc[d] || (NFc[d] = new Intl.NumberFormat(LOC, { minimumFractionDigits: d, maximumFractionDigits: d })); }
+let NFint;
+try { NFint = new Intl.NumberFormat(LOC, { maximumFractionDigits: 0, useGrouping: 'always' }); } catch (e) { NFint = new Intl.NumberFormat(LOC, { maximumFractionDigits: 0 }); }
+const fInt = (n) => NFint.format(n);
+const fNum = (v, d = 1) => (v == null || !isFinite(v) ? '—' : nf(d).format(v)).replace('-', '−');
+const fT = (v) => (v == null ? '—' : fNum(v, 1) + ' °C');
+const fRH = (v) => (v == null ? '—' : fNum(v, 1) + ' %');
+const fV = (mv) => (mv ? fNum(mv / 1000, 2) + ' V' : '—');
+function fTrim(v, maxDec = 2) {
+  if (v == null || !isFinite(v)) return '';
+  return new Intl.NumberFormat(LOC, { maximumFractionDigits: maxDec, useGrouping: false }).format(v).replace('-', '−');
+}
+const DF = {
+  time: new Intl.DateTimeFormat(LOC, { hour: '2-digit', minute: '2-digit' }),
+  dayShort: new Intl.DateTimeFormat(LOC, { day: 'numeric', month: 'short' }),
+  wdDay: new Intl.DateTimeFormat(LOC, { weekday: 'short', day: 'numeric' }),
+  month: new Intl.DateTimeFormat(LOC, { month: 'short' }),
+  monthYear: new Intl.DateTimeFormat(LOC, { month: 'short', year: '2-digit' }),
+  full: new Intl.DateTimeFormat(LOC, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
+  date: new Intl.DateTimeFormat(LOC, { day: 'numeric', month: 'short', year: 'numeric' }),
+  csv: new Intl.DateTimeFormat(LOC, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }),
+};
+const fmt = (df, ts) => (validTs(ts) ? df.format(new Date(ts * 1000)).replace(/\.$/, '') : '—');
+const RTF = new Intl.RelativeTimeFormat('es', { numeric: 'auto' });
+function fRel(ts) {
+  if (!validTs(ts)) return '—';
+  const d = ts - nowS();
+  const a = Math.abs(d);
+  if (a < 45) return d < 0 ? 'hace un momento' : 'en un momento';
+  if (a < 3600) return RTF.format(Math.round(d / 60), 'minute');
+  if (a < 86400) return RTF.format(Math.round(d / 3600), 'hour');
+  return RTF.format(Math.round(d / 86400), 'day');
+}
+function fDur(s) {
+  s = Math.max(0, Math.round(s));
+  if (s < 60) return s + ' s';
+  if (s < 3600) return Math.floor(s / 60) + ' min';
+  if (s < 86400) return Math.floor(s / 3600) + ' h ' + Math.floor((s % 3600) / 60) + ' min';
+  return Math.floor(s / 86400) + ' d ' + Math.floor((s % 86400) / 3600) + ' h';
+}
+function fMMSS(s) { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+function fYears(days) {
+  if (!isFinite(days)) return 'más de 10 años';
+  const y = days / 365;
+  if (y >= 10) return 'más de 10 años';
+  if (y >= 1) return '≈ ' + fNum(y, 1) + ' años';
+  const m = days / 30.4;
+  if (m >= 1) return '≈ ' + fNum(m, m < 3 ? 1 : 0) + ' meses';
+  return '≈ ' + Math.round(days) + ' días';
+}
+
+const ERR_TEXT = {
+  bad_json: 'El sensor no entendió la petición.',
+  unknown_cmd: 'El firmware del sensor no reconoce este comando.',
+  invalid: 'El sensor rechazó un valor no válido.',
+  busy: 'El sensor está ocupado. Inténtalo de nuevo en unos segundos.',
+  no_wifi_config: 'Falta configurar la red WiFi o la URL del servidor.',
+  wifi_fail: 'No se pudo conectar a la red WiFi.',
+  http_fail: 'El servidor no respondió correctamente.',
+  time_invalid: 'La hora del sensor no es válida. Sincronízala primero.',
+  internal: 'Error interno del sensor.',
+  timeout: 'El sensor no respondió a tiempo.',
+  disconnected: 'Se perdió la conexión con el sensor.',
+  too_long: 'Los datos son demasiado largos para enviarlos de una vez.',
+  write_fail: 'No se pudo enviar el comando por Bluetooth.',
+  connect_timeout: 'El sensor no responde. ¿Está en modo configuración?',
+};
+function errText(e) {
+  if (!e) return 'Error desconocido.';
+  if (ERR_TEXT[e.code]) return ERR_TEXT[e.code];
+  const m = String(e.message || e);
+  if (/GATT Server is disconnected|disconnected/i.test(m)) return ERR_TEXT.disconnected;
+  if (/NetworkError|connection failed|Connection attempt failed/i.test(m)) return 'No se pudo conectar. Acércate al sensor y vuelve a intentarlo.';
+  return m;
+}
+const FIELD_NAMES = { name: 'Nombre', meas_min: 'Medir cada', upload_min: 'Enviar cada', wifi_ssid: 'Red WiFi', wifi_pass: 'Contraseña WiFi', url: 'URL', token: 'Token', t_offset: 'Ajuste de temperatura', rh_offset: 'Ajuste de humedad', tx_power: 'Potencia', cfg_timeout_min: 'Tiempo en modo configuración' };
+const WAKE_TXT = { timer: 'Temporizador (medición)', button: 'Botón WAKE', usb: 'Conexión USB', deepsleep: 'Reposo profundo' };
+const RESET_TXT = { POWERON: 'Encendido', EXT: 'Pin de reinicio', SW: 'Reinicio por software', PANIC: 'Fallo de software', INT_WDT: 'Watchdog', TASK_WDT: 'Watchdog', WDT: 'Watchdog', DEEPSLEEP: 'Salida de reposo', BROWNOUT: 'Caída de tensión', SDIO: 'SDIO', USB: 'USB', JTAG: 'JTAG', EFUSE: 'eFuse', PWR_GLITCH: 'Fallo de alimentación', CPU_LOCKUP: 'Bloqueo de CPU' };
+
+/* =========================================================================
+   Estado
+   ========================================================================= */
+const S = {
+  session: null,          // { transport, client, kind, offs[] }
+  conn: 'idle',           // idle | connecting | connected | disconnected
+  hello: null, status: null, statusAt: 0, cfg: null,
+  mac: null,
+  records: [],            // ordenados por índice
+  dataVersion: 0,
+  measured: null,
+  sync: { running: false, again: false, done: 0, total: 0, error: null },
+  bye: null, expect: null,
+  tab: 'panel', range: '24h', page: 0, onlyFlags: false,
+  demo: null,
+  reconnectToken: 0,
+  polling: false,
+};
+const store = new LogStore();
+const storeReady = store.open();
+
+/* =========================================================================
+   Toasts y diálogos
+   ========================================================================= */
+function toast(msg, kind = 'info', ms = 3400) {
+  const box = $('#toasts');
+  while (box.children.length >= 3) box.firstChild.remove();
+  const el = h('div', { class: 'toast ' + kind, role: kind === 'err' ? 'alert' : 'status' },
+    icon(kind === 'ok' ? 'i-check' : kind === 'err' ? 'i-alert' : 'i-info', 'i'), h('span', { text: msg }));
+  box.append(el);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 300); }, ms);
+}
+function confirmDlg(o) {
+  const d = $('#dlg');
+  if (typeof d.showModal !== 'function') return Promise.resolve({ ok: window.confirm(o.title + '\n\n' + o.text), checked: false });
+  return new Promise((res) => {
+    $('#dlg-title').textContent = o.title;
+    $('#dlg-text').textContent = o.text;
+    const ok = $('#dlg-ok');
+    ok.textContent = o.ok || 'Aceptar';
+    ok.className = 'btn ' + (o.danger ? 'btn-danger' : 'btn-primary');
+    const row = $('#dlg-check-row');
+    row.hidden = !o.check;
+    $('#dlg-check').checked = false;
+    if (o.check) { $('#dlg-check-text').textContent = o.check; $('#dlg-check-hint').textContent = o.checkHint || ''; }
+    d.returnValue = '';
+    d.addEventListener('close', () => res({ ok: d.returnValue === 'ok', checked: $('#dlg-check').checked }), { once: true });
+    d.showModal();
+    (o.danger ? $('#dlg-cancel') : ok).focus();
+  });
+}
+async function withBusy(btn, label, fn) {
+  const old = Array.from(btn.childNodes);
+  btn.disabled = true;
+  btn.setAttribute('aria-busy', 'true');
+  btn.replaceChildren(h('span', { class: 'spin' }), h('span', { text: label }));
+  try { return await fn(); }
+  finally {
+    btn.replaceChildren(...old);
+    btn.removeAttribute('aria-busy');
+    btn.disabled = btn.hasAttribute('data-needs-conn') && S.conn !== 'connected';
+  }
+}
+
+/* =========================================================================
+   Conexión y sesión
+   ========================================================================= */
+const client = () => (S.session ? S.session.client : null);
+function req(cmd, params, opts) {
+  const c = client();
+  if (!c || S.conn === 'disconnected' || S.conn === 'idle') return Promise.reject(new SensorError('disconnected', 'Sin conexión'));
+  return c.request(cmd, params || {}, opts || {});
+}
+
+async function startSession(transport) {
+  if (S.session) { S.session.offs.forEach((f) => f()); }
+  const c = new SensorClient(transport);
+  const sess = { transport, client: c, kind: transport.kind, offs: [] };
+  S.session = sess;
+  S.bye = null; S.expect = null;
+  setConn('connecting');
+  sess.offs.push(c.on('disconnect', () => onDisconnected(sess)));
+  sess.offs.push(c.on('event', (e) => onEvent(sess, e)));
+  try {
+    await c.connect();
+    const hello = await c.request('hello');
+    if (S.session !== sess) return;
+    S.hello = hello;
+    const mac = normMac(hello.mac) || ('dev-' + (transport.id || 'x'));
+    if (mac !== S.mac) {
+      S.mac = mac; S.cfg = null; S.status = null; S.measured = null; S.page = 0; S.records = [];
+      fillForm.base = null;
+      await loadCache();
+    }
+    if (hello.proto != null && Number(hello.proto) !== PROTO.VERSION) toast('El sensor usa la versión ' + hello.proto + ' del protocolo; algunas funciones podrían no ir bien.', 'err', 6000);
+    showMain();
+    const st = await c.request('status');
+    applyStatus(st);
+    await maybeSyncTime(st);
+    if (S.session !== sess) return;
+    const gc = await c.request('get_config');
+    S.cfg = gc.cfg || {};
+    fillForm(S.cfg);
+    setConn('connected');
+    renderAll();
+    syncLog();
+  } catch (e) {
+    if (S.session === sess) {
+      // Fallo durante el saludo: quien llamó decide qué mostrar (sin banner ni reconexión automática).
+      sess.offs.forEach((f) => f());
+      sess.offs = [];
+      try { transport.disconnect(); } catch (_) { /* nada */ }
+      if (S.conn !== 'idle') setConn('disconnected');
+    }
+    throw e;
+  }
+}
+
+function setConn(state) {
+  S.conn = state;
+  const connected = state === 'connected';
+  $$('[data-needs-conn]').forEach((b) => { if (!b.hasAttribute('aria-busy')) b.disabled = !connected; });
+  $('#cfg-fs').disabled = !connected;
+  if (connected) hideBanner();
+  if (state === 'connecting' && !$('#view-main').hidden && S.status) {
+    showBanner('busy', 'Conectando…', 'Buscando el sensor. Si se apagó, pulsa WAKE.', [], 'i-bt');
+  }
+  renderHeader();
+  renderConfigState();
+}
+
+function onDisconnected(sess) {
+  if (S.session !== sess) return;
+  setConn('disconnected');
+  S.sync.running = false;
+  renderSync();
+  const reconnectBtn = { label: 'Reconectar', primary: true, fn: () => reconnect() };
+  const otherBtn = { label: 'Conectar otro', fn: () => goConnectScreen() };
+  if (S.expect === 'user') {
+    showBanner('info', 'Desconectado', 'El sensor sigue en modo configuración hasta que pase el tiempo de espera.', [reconnectBtn, otherBtn], 'i-unlink');
+  } else if (S.bye || S.expect === 'exit') {
+    const why = S.bye === 'timeout' ? ' (pasó el tiempo de configuración sin actividad)' : '';
+    showBanner('bye', 'El sensor se apagó para ahorrar batería' + why + '.', 'Pulsa WAKE para volver a configurarlo y luego «Reconectar».', [reconnectBtn, otherBtn], 'i-power');
+  } else if (S.expect === 'reboot') {
+    showBanner('busy', 'Reiniciando el sensor…', 'Intentando reconectar. Si no vuelve, pulsa WAKE y luego «Reconectar».', [reconnectBtn], 'i-refresh');
+    autoReconnect([4000, 8000, 15000]);
+  } else {
+    showBanner('lost', 'Se perdió la conexión con el sensor', 'Acércate al sensor. Si se apagó, pulsa WAKE y luego «Reconectar».', [reconnectBtn, otherBtn], 'i-unlink');
+    autoReconnect([1500, 5000]);
+  }
+}
+
+async function autoReconnect(delays) {
+  const token = ++S.reconnectToken;
+  for (let k = 0; k < delays.length; k++) {
+    await sleep(delays[k]);
+    if (token !== S.reconnectToken || !S.session || S.conn === 'connected' || S.conn === 'connecting') return;
+    try { await startSession(S.session.transport); toast('Reconectado', 'ok'); return; }
+    catch (e) {
+      if (token !== S.reconnectToken) return;
+      if (k < delays.length - 1) {
+        showBanner('lost', 'Se perdió la conexión con el sensor', 'Reintentando en unos segundos… Si se apagó, pulsa WAKE.', [{ label: 'Reconectar', primary: true, fn: () => reconnect() }, { label: 'Conectar otro', fn: () => goConnectScreen() }], 'i-unlink');
+      }
+    }
+  }
+  if (token === S.reconnectToken && S.conn !== 'connected') {
+    showBanner('lost', 'No se pudo reconectar', 'Pulsa WAKE en el sensor, acércate y vuelve a intentarlo.', [{ label: 'Reconectar', primary: true, fn: () => reconnect() }, { label: 'Conectar otro', fn: () => goConnectScreen() }], 'i-unlink');
+  }
+}
+
+async function reconnect() {
+  if (!S.session) return goConnectScreen();
+  S.reconnectToken++;
+  try {
+    await startSession(S.session.transport);
+    toast('Reconectado', 'ok');
+  } catch (e) {
+    showBanner('lost', 'No se pudo reconectar', errText(e) + ' Pulsa WAKE en el sensor y vuelve a intentarlo.', [{ label: 'Reintentar', primary: true, fn: () => reconnect() }, { label: 'Conectar otro', fn: () => goConnectScreen() }], 'i-unlink');
+  }
+}
+
+function goConnectScreen() {
+  S.reconnectToken++;
+  if (S.session && S.conn === 'connected') { S.expect = 'user'; S.session.client.disconnect(); }
+  if (S.session) S.session.offs.forEach((f) => f());
+  S.session = null;
+  setConn('idle');
+  $('#view-main').hidden = true;
+  $('#view-connect').hidden = false;
+  setConnectMsg('');
+}
+
+function showMain() {
+  if (!$('#view-main').hidden) return;
+  $('#view-connect').hidden = true;
+  $('#view-main').hidden = false;
+  selectTab(S.tab, false);
+}
+
+function showBanner(kind, title, text, actions, ic) {
+  const b = $('#banner');
+  b.dataset.kind = kind;
+  $('#banner-ic').setAttribute('href', '#' + (ic || 'i-info'));
+  $('#banner-title').textContent = title;
+  $('#banner-text').textContent = text;
+  $('#banner-actions').replaceChildren(...(actions || []).map((a) =>
+    h('button', { type: 'button', class: 'btn btn-sm ' + (a.primary ? 'btn-primary' : 'btn-secondary'), onclick: (ev) => withBusy(ev.currentTarget, a.primary ? 'Conectando…' : a.label, a.fn) }, a.label)));
+  if (kind === 'busy' && !(actions || []).length) $('#banner-actions').append(h('span', { class: 'spin', style: 'color:var(--warn)' }));
+  b.hidden = false;
+}
+function hideBanner() { $('#banner').hidden = true; }
+
+async function maybeSyncTime(st) {
+  if (!st) return;
+  const diff = Number(st.now) - nowS();
+  if (st.time_valid === false || !isFinite(diff) || Math.abs(diff) > 5) {
+    try {
+      await setTime();
+      toast('Hora sincronizada', 'ok');
+    } catch (e) { toast('No se pudo sincronizar la hora: ' + errText(e), 'err'); }
+  }
+}
+async function setTime() {
+  const r = await req('set_time', { ts: Math.round(nowS()) });
+  if (S.status) { S.status.now = r.now != null ? r.now : Math.round(nowS()); S.status.time_valid = true; S.statusPhone = nowS(); }
+  renderSystem();
+  return r;
+}
+
+function applyStatus(st) {
+  S.status = st;
+  S.statusAt = performance.now();
+  S.statusPhone = nowS();
+  renderHeader(); renderPanel(); renderSystem();
+}
+async function refreshStatus() {
+  const st = await req('status');
+  applyStatus(st);
+  return st;
+}
+async function pollStatus() {
+  if (S.polling || S.conn !== 'connected' || document.visibilityState !== 'visible') return;
+  S.polling = true;
+  try { await refreshStatus(); } catch (e) { /* silencioso */ } finally { S.polling = false; }
+}
+
+function onEvent(sess, e) {
+  if (S.session !== sess) return;
+  switch (e.evt) {
+    case 'reading': {
+      if (S.status) {
+        S.status.last = (e.t == null && e.rh == null) ? null : { ts: e.ts, t: e.t, rh: e.rh };
+        if (e.batt_mv) S.status.batt_mv = e.batt_mv;
+        const L = S.status.log;
+        if (L && typeof e.i === 'number' && e.i >= L.next) { L.next = e.i + 1; L.count = (L.count || 0) + 1; L.pending = (L.pending || 0) + 1; }
+      }
+      S.measured = null;
+      flashHero();
+      renderPanel();
+      scheduleSync();
+      break;
+    }
+    case 'upload': {
+      const ok = e.code >= 200 && e.code < 300;
+      if (S.status) {
+        const u = S.status.upload = S.status.upload || {};
+        u.last_try = Math.round(nowS()); u.code = e.code; u.err = e.err || ''; u.sent = e.sent;
+        if (ok) { u.last_ok = u.last_try; if (S.status.log) S.status.log.pending = Math.max(0, (S.status.log.pending || 0) - (e.sent || 0)); }
+      }
+      toast(ok ? 'Envío programado completado (' + (e.sent || 0) + ' lecturas)' : 'Falló el envío programado' + (e.err ? ': ' + e.err : ''), ok ? 'ok' : 'err');
+      renderPanel();
+      break;
+    }
+    case 'bye':
+      S.bye = e.reason || 'timeout';
+      break;
+    default:
+      break;
+  }
+}
+
+/* =========================================================================
+   Historial: caché + descarga incremental
+   ========================================================================= */
+async function loadCache() {
+  await storeReady;
+  try { S.records = await store.getAll(S.mac); } catch (e) { S.records = []; }
+  S.dataVersion++;
+  renderPanel(); renderData(); renderSystem();
+}
+async function addRecords(recs) {
+  if (!recs.length) return;
+  await store.putMany(S.mac, recs);
+  const last = S.records.length ? S.records[S.records.length - 1].i : -Infinity;
+  if (recs[0].i > last) { for (const r of recs) S.records.push(r); }
+  else {
+    const m = new Map(S.records.map((r) => [r.i, r]));
+    for (const r of recs) m.set(r.i, r);
+    S.records = Array.from(m.values()).sort((a, b) => a.i - b.i);
+  }
+  S.dataVersion++;
+  renderDataSoon();
+}
+const scheduleSync = debounce(() => syncLog(), 1500);
+
+async function syncLog() {
+  const sess = S.session;
+  if (!sess || S.conn !== 'connected') return;
+  if (S.sync.running) { S.sync.again = true; return; }
+  S.sync.running = true; S.sync.error = null;
+  renderSync();
+  try {
+    do {
+      S.sync.again = false;
+      const st = await refreshStatus();
+      const L = st.log || {};
+      const first = Math.max(0, Number(L.first) || 0);
+      const next = Math.max(0, Number(L.next) || 0);
+      let maxCached = S.records.length ? S.records[S.records.length - 1].i : -1;
+      if (maxCached >= next && next > 0) {
+        // El contador del sensor es menor que lo guardado: el registro se reinició.
+        await store.clear(S.mac);
+        S.records = []; S.dataVersion++; maxCached = -1;
+        toast('El registro del sensor empezó de nuevo; se descarga completo.', 'info', 5000);
+      }
+      const start = Math.max(maxCached + 1, first);
+      let cursor = start;
+      S.sync.total = Math.max(0, next - start);
+      S.sync.done = 0;
+      renderSync();
+      let tries = 0;
+      while (cursor < next) {
+        if (S.session !== sess || S.conn !== 'connected') throw new SensorError('disconnected');
+        const count = Math.min(2000, next - cursor);
+        const base = cursor - start;
+        let r;
+        try {
+          r = await sess.client.request('log', { from: cursor, count }, {
+            onProgress: (n) => { S.sync.done = Math.min(S.sync.total, base + n); renderSyncSoon(); },
+          });
+        } catch (e) {
+          if ((e.code === 'timeout' || e.code === 'busy') && tries < 2) { tries++; continue; }
+          throw e;
+        }
+        await addRecords(r.records);
+        if (!r.countOk && tries < 2) {
+          console.warn('log: recibidos', r.decoded, 'de', r.sent, r.diag);
+          tries++;
+          continue;
+        }
+        tries = 0;
+        const sent = Number(r.sent) || 0, rn = Number(r.next);
+        cursor = sent > 0 && rn > cursor ? rn : cursor + count;
+        S.sync.done = Math.min(S.sync.total, cursor - start);
+        renderSync();
+      }
+    } while (S.sync.again);
+    S.sync.lastAt = Date.now();
+  } catch (e) {
+    S.sync.error = e;
+    if (e.code !== 'disconnected') toast('No se pudo descargar todo el historial: ' + errText(e), 'err', 5000);
+  } finally {
+    S.sync.running = false;
+    renderSync();
+    renderData(); renderPanel(); renderSystem();
+  }
+}
+
+/* =========================================================================
+   Cabecera
+   ========================================================================= */
+function cfgRemaining() {
+  const st = S.status;
+  if (!st || st.cfg_remaining_s == null || S.conn !== 'connected') return null;
+  return Math.max(0, Number(st.cfg_remaining_s) - (performance.now() - S.statusAt) / 1000);
+}
+function deviceName() { return (S.cfg && S.cfg.name) || (S.hello && S.hello.name) || (S.session && S.session.transport.name) || 'Sensor'; }
+function renderHeader() {
+  $('#hdr-name').textContent = deviceName();
+  const pill = $('#hdr-pill');
+  const demo = S.session && S.session.kind === 'demo';
+  const map = { connecting: ['connecting', 'Conectando…'], connected: [demo ? 'demo' : 'connected', demo ? 'Demo' : 'Conectado'], disconnected: ['disconnected', 'Desconectado'], idle: ['disconnected', 'Sin conexión'] };
+  const [st, tx] = map[S.conn] || map.idle;
+  pill.dataset.state = st;
+  $('#hdr-pill-text').textContent = tx;
+  renderHeaderSub();
+}
+function renderHeaderSub() {
+  const sub = $('#hdr-sub');
+  const demo = S.session && S.session.kind === 'demo';
+  const pre = demo ? 'Modo demo · ' : '';
+  if (S.conn === 'connecting') { sub.textContent = pre + 'Conectando por Bluetooth…'; return; }
+  if (S.conn !== 'connected') { sub.textContent = pre + 'Sin conexión · datos guardados en el teléfono'; return; }
+  const st = S.status;
+  if (st && (st.mode === 'usb' || st.usb) && st.cfg_remaining_s == null) {
+    sub.replaceChildren(icon('i-plug', 'i xs'), h('span', { text: pre + 'Alimentado por USB · siempre activo' }));
+    return;
+  }
+  const rem = cfgRemaining();
+  if (rem == null) { sub.textContent = pre + 'Modo configuración'; return; }
+  const total = Math.max(60, ((S.cfg && S.cfg.cfg_timeout_min) || 10) * 60);
+  const C = 2 * Math.PI * 5;
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 14 14');
+  svg.innerHTML = '<circle class="trk" cx="7" cy="7" r="5"/><circle class="val" cx="7" cy="7" r="5" stroke-dasharray="' + C.toFixed(2) + '" stroke-dashoffset="' + (C * (1 - clamp(rem / total, 0, 1))).toFixed(2) + '"/>';
+  const cd = h('span', { class: 'countdown' + (rem < 60 ? ' low' : ''), title: 'Tiempo hasta que el sensor se apague' }, svg, h('span', { text: 'se apaga en ' + fMMSS(rem) }));
+  sub.replaceChildren(h('span', { text: pre + 'Configuración ·' }), cd);
+}
+
+/* =========================================================================
+   Pestañas
+   ========================================================================= */
+const TABS = ['panel', 'datos', 'config', 'sistema'];
+function selectTab(name, focus) {
+  S.tab = name;
+  for (const t of TABS) {
+    const b = $('#tb-' + t), p = $('#tab-' + t);
+    const on = t === name;
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+    b.tabIndex = on ? 0 : -1;
+    p.hidden = !on;
+  }
+  if (focus) $('#tb-' + name).focus();
+  window.scrollTo({ top: 0 });
+  if (name === 'datos') renderData();
+  if (name === 'panel') renderPanel();
+  if (name === 'sistema') renderSystem();
+  renderConfigState();
+}
+
+/* =========================================================================
+   Panel
+   ========================================================================= */
+function recordsSince(ts) {
+  const out = [];
+  for (let k = S.records.length - 1; k >= 0; k--) {
+    const r = S.records[k];
+    if (hasTimeInvalid(r)) continue;
+    if (r.ts < ts) { if (S.records.length - k > 400) break; continue; }
+    out.push(r);
+  }
+  return out.sort((a, b) => a.ts - b.ts);
+}
+function setMetric(el, v, unit, dec) {
+  if (v == null) { el.replaceChildren(h('span', { class: 'na' }, icon('i-alert'), 'Error del sensor')); return; }
+  el.replaceChildren(h('span', { class: 'v', text: fNum(v, dec) }), h('span', { class: 'u', text: unit }));
+}
+function flashHero() {
+  const el = $('#hero');
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+  setTimeout(() => el.classList.remove('flash'), 1300);
+}
+function renderPanel() {
+  if (S.tab !== 'panel' || $('#view-main').hidden) return;
+  const st = S.status;
+  const connected = S.conn === 'connected';
+  let src = null, kind = 'Lectura actual', state = 'ok';
+  const lastRec = S.records.length ? S.records[S.records.length - 1] : null;
+  if (S.measured && connected && (!st || !st.last || S.measured.ts >= st.last.ts)) { src = S.measured; kind = 'Medición en vivo'; }
+  else if (st && st.last) { src = st.last; kind = connected ? 'Lectura actual' : 'Último dato recibido'; }
+  else if (st && st.last === null) { state = 'err'; kind = 'Lectura actual'; }
+  else if (lastRec) { src = lastRec; kind = 'Último registro guardado'; }
+  else state = 'none';
+  $('#hero-kind').textContent = kind;
+
+  const ht = $('#hero-t'), hr = $('#hero-rh');
+  if (state === 'err') { setMetric(ht, null); setMetric(hr, null); }
+  else if (src) { setMetric(ht, src.t, '°C', 1); setMetric(hr, src.rh, '%', 1); }
+  else if (S.conn === 'connecting' || S.conn === 'idle') {
+    ht.replaceChildren(h('span', { class: 'skel', style: 'width:110px;height:50px' }));
+    hr.replaceChildren(h('span', { class: 'skel', style: 'width:110px;height:50px' }));
+  } else { ht.replaceChildren(h('span', { class: 'v muted', text: '—' })); hr.replaceChildren(h('span', { class: 'v muted', text: '—' })); }
+  $('#hero-age').textContent = src && validTs(src.ts) ? fRel(src.ts) + ' · ' + fmt(DF.time, src.ts) : (src ? 'hora desconocida' : '');
+
+  // 24 h
+  const day = recordsSince(nowS() - 86400);
+  const tv = day.map((r) => r.t).filter((v) => v != null), hv = day.map((r) => r.rh).filter((v) => v != null);
+  const mm = (a) => (a.length ? [Math.min(...a), Math.max(...a)] : null);
+  const mt = mm(tv), mh = mm(hv);
+  $('#hero-t-sub').textContent = mt ? 'mín ' + fNum(mt[0]) + ' · máx ' + fNum(mt[1]) : 'Sin datos de 24 h';
+  $('#hero-rh-sub').textContent = mh ? 'mín ' + fNum(mh[0]) + ' · máx ' + fNum(mh[1]) : 'Sin datos de 24 h';
+  drawSpark($('#spark-t'), day, 't', '--temp', 1.5);
+  drawSpark($('#spark-rh'), day, 'rh', '--hum', 4);
+  $('#hero-live').textContent = kind === 'Medición en vivo' ? 'En vivo · no se guarda en el registro' : (S.sync.running ? 'Descargando historial…' : 'Últimas 24 h · toca para ver más');
+
+  renderBattery();
+  renderUpload();
+}
+
+function renderBattery() {
+  const st = S.status;
+  const ico = $('#batt-ico'), main = $('#batt-main'), kv = $('#batt-kv');
+  const segs = Array.from(ico.children);
+  ico.classList.remove('mid', 'low', 'usb');
+  if (!st) {
+    segs.forEach((s) => s.classList.remove('on'));
+    main.textContent = '—';
+    const lr = S.records.length ? S.records[S.records.length - 1] : null;
+    setKV(kv, lr && lr.v ? [['Última lectura guardada', fV(lr.v)]] : []);
+    return;
+  }
+  const mv = (S.measured && S.measured.batt_mv) || st.batt_mv;
+  const pct = clamp(((mv || 0) - 900) / 900 * 100, 0, 100);
+  const lastLoad = (() => { for (let k = S.records.length - 1; k >= Math.max(0, S.records.length - 200); k--) if (S.records[k].vl) return S.records[k]; return null; })();
+  const rows = [];
+  if (st.usb) {
+    ico.classList.add('usb');
+    segs.forEach((s) => s.classList.add('on'));
+    main.replaceChildren(h('span', { text: 'USB' }), ' ', h('small', { text: st.batt_present ? '· con batería' : '· sin batería' }));
+    rows.push(['Alimentación', 'USB']);
+    rows.push(['Batería', st.batt_present ? 'Instalada · ' + fV(mv) : 'No instalada']);
+  } else {
+    const on = Math.ceil(pct / 20);
+    segs.forEach((s, k) => s.classList.toggle('on', k < on));
+    if (pct < 15) ico.classList.add('low'); else if (pct < 40) ico.classList.add('mid');
+    main.replaceChildren(h('span', { text: fNum(pct, 0) + ' %' }), ' ', h('small', { text: fV(mv) }));
+    rows.push(['Estado', pct < 15 ? h('span', { class: 'badge bad', text: 'Cambiar pronto' }) : pct < 40 ? h('span', { class: 'badge warn', text: 'Media' }) : h('span', { class: 'badge good', text: 'Buena' })]);
+  }
+  if (lastLoad) rows.push(['Bajo carga WiFi', fV(lastLoad.vl)]);
+  rows.push(['Escala', '0,9 V vacía · 1,8 V llena']);
+  if (st.brownouts) rows.push(['Caídas de tensión', h('span', { class: 'badge warn', text: fInt(st.brownouts) })]);
+  setKV(kv, rows);
+}
+
+function uploadsConfigured() { return S.cfg && S.cfg.upload_min > 0 && S.cfg.wifi_ssid && S.cfg.url; }
+function renderUpload() {
+  const st = S.status, u = st && st.upload;
+  const main = $('#up-main'), kv = $('#up-kv'), badge = $('#up-badge');
+  const rows = [];
+  if (!st) { main.textContent = '—'; badge.replaceChildren(); setKV(kv, []); return; }
+  const pending = st.log ? st.log.pending : null;
+  if (S.cfg && S.cfg.upload_min === 0) {
+    badge.replaceChildren(h('span', { class: 'badge', text: 'Desactivado' }));
+    main.textContent = 'Sin envíos';
+    $('#up-kind').textContent = 'Los datos se quedan en el sensor';
+  } else if (S.cfg && (!S.cfg.wifi_ssid || !S.cfg.url)) {
+    badge.replaceChildren(h('span', { class: 'badge warn', text: 'Sin configurar' }));
+    main.textContent = 'Falta configurar';
+    $('#up-kind').textContent = !S.cfg.wifi_ssid ? 'Falta la red WiFi' : 'Falta la URL del servidor';
+    rows.push(['', h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => selectTab('config', true), text: 'Ir a configuración' })]);
+  } else {
+    $('#up-kind').textContent = S.cfg ? 'WiFi «' + S.cfg.wifi_ssid + '»' : 'Al servidor por WiFi';
+    const okCode = u && u.code >= 200 && u.code < 300;
+    if (!u || !validTs(u.last_try)) { badge.replaceChildren(h('span', { class: 'badge', text: 'Pendiente' })); main.textContent = 'Aún no ha enviado'; }
+    else if (okCode && u.last_ok >= u.last_try) { badge.replaceChildren(h('span', { class: 'badge good' }, icon('i-check'), 'Correcto')); main.textContent = fRel(u.last_ok); }
+    else { badge.replaceChildren(h('span', { class: 'badge bad' }, icon('i-alert'), 'Falló')); main.textContent = validTs(u.last_ok) ? 'Último bien ' + fRel(u.last_ok) : 'Nunca con éxito'; }
+  }
+  if (u && validTs(u.last_try)) rows.push(['Último intento', fmt(DF.full, u.last_try) + (u.code ? ' · ' + u.code : '')]);
+  if (u && u.err) rows.push(['Error', h('span', { style: 'color:var(--bad)', text: u.err })]);
+  if (u && u.sent != null && validTs(u.last_try)) rows.push(['Lecturas enviadas', fInt(u.sent)]);
+  if (pending != null) rows.push(['Pendientes de enviar', fInt(pending)]);
+  if (u && validTs(u.next_due) && uploadsConfigured()) rows.push(['Próximo envío', fmt(DF.time, u.next_due) + ' · ' + fRel(u.next_due)]);
+  setKV(kv, rows);
+}
+function setKV(dl, rows) {
+  dl.replaceChildren(...rows.flatMap(([k, v]) => [h('dt', { text: k }), h('dd', {}, v)]));
+}
+
+/* --- Minigráficas --- */
+function themeColors() {
+  const cs = getComputedStyle(document.documentElement);
+  const g = (n) => cs.getPropertyValue(n).trim();
+  return { temp: g('--temp'), hum: g('--hum'), grid: g('--grid'), axis: g('--axis'), ink: g('--ink'), ink2: g('--ink-2'), ink3: g('--ink-3'), surface: g('--surface'), bad: g('--bad'), font: g('--font') || 'system-ui, sans-serif' };
+}
+function rgba(hex, a) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+}
+function fitCanvas(cv) {
+  const W = cv.clientWidth, H = cv.clientHeight;
+  if (!W || !H) return null;
+  const dpr = Math.min(3, window.devicePixelRatio || 1);
+  const pw = Math.round(W * dpr), ph = Math.round(H * dpr);
+  if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  return { ctx, W, H };
+}
+function drawSpark(cv, recs, key, colorVar, minSpan) {
+  const f = fitCanvas(cv);
+  if (!f) return;
+  const { ctx, W, H } = f;
+  const C = themeColors();
+  const color = colorVar === '--temp' ? C.temp : C.hum;
+  const pts = recs.filter((r) => r[key] != null);
+  ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, H - 0.5); ctx.lineTo(W, H - 0.5); ctx.stroke();
+  if (pts.length < 2) return;
+  const t1 = nowS(), t0 = t1 - 86400;
+  let lo = Infinity, hi = -Infinity;
+  for (const p of pts) { lo = Math.min(lo, p[key]); hi = Math.max(hi, p[key]); }
+  if (hi - lo < minSpan) { const c = (hi + lo) / 2; lo = c - minSpan / 2; hi = c + minSpan / 2; }
+  const pad = 5;
+  const x = (ts) => 2 + (ts - t0) / (t1 - t0) * (W - 8);
+  const y = (v) => pad + (1 - (v - lo) / (hi - lo)) * (H - pad * 2);
+  const gap = 2.5 * medianStep(pts.map((p) => p.ts));
+  const segs = [];
+  let cur = [];
+  for (let k = 0; k < pts.length; k++) {
+    if (k && pts[k].ts - pts[k - 1].ts > gap) { segs.push(cur); cur = []; }
+    cur.push(pts[k]);
+  }
+  segs.push(cur);
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, rgba(color, 0.18)); grad.addColorStop(1, rgba(color, 0));
+  for (const s of segs) {
+    if (s.length < 2) continue;
+    ctx.beginPath();
+    s.forEach((p, k) => (k ? ctx.lineTo(x(p.ts), y(p[key])) : ctx.moveTo(x(p.ts), y(p[key]))));
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.lineWidth = 1.75; ctx.strokeStyle = color; ctx.stroke();
+    ctx.lineTo(x(s[s.length - 1].ts), H); ctx.lineTo(x(s[0].ts), H); ctx.closePath();
+    ctx.fillStyle = grad; ctx.fill();
+  }
+  const p = pts[pts.length - 1];
+  ctx.beginPath(); ctx.arc(x(p.ts), y(p[key]), 3.5, 0, Math.PI * 2);
+  ctx.fillStyle = color; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = C.surface; ctx.stroke();
+}
+function medianStep(ts) {
+  const d = [];
+  for (let k = 1; k < ts.length && d.length < 600; k++) { const v = ts[k] - ts[k - 1]; if (v > 0) d.push(v); }
+  if (!d.length) return 900;
+  d.sort((a, b) => a - b);
+  return d[Math.floor(d.length / 2)];
+}
+
+/* =========================================================================
+   Datos: preparación por periodo
+   ========================================================================= */
+const RANGE_SPAN = { '24h': 86400, '7d': 7 * 86400, '30d': 30 * 86400 };
+const RANGE_LABEL = { '24h': '24 h', '7d': '7 días', '30d': '30 días', all: 'todo' };
+let rangeCache = { key: '', d: null };
+function rangeData() {
+  const key = S.dataVersion + '|' + S.range + '|' + Math.floor(Date.now() / 60000);
+  if (rangeCache.key === key) return rangeCache.d;
+  const recs = S.records;
+  let t0, t1;
+  const valid = [];
+  if (S.range === 'all') {
+    for (const r of recs) if (!hasTimeInvalid(r) && validTs(r.ts)) valid.push(r);
+    if (valid.length) {
+      t0 = Infinity; t1 = -Infinity;
+      for (const r of valid) { if (r.ts < t0) t0 = r.ts; if (r.ts > t1) t1 = r.ts; }
+      if (t1 - t0 < 3600) t0 = t1 - 3600;
+    }
+  } else {
+    t1 = nowS(); t0 = t1 - RANGE_SPAN[S.range];
+    for (let k = recs.length - 1; k >= 0; k--) {
+      const r = recs[k];
+      if (hasTimeInvalid(r)) continue;
+      if (r.ts >= t0 && r.ts <= t1 + 300) valid.push(r);
+      else if (r.ts < t0 - 30 * 86400) break; // muy atrás: el resto es más antiguo
+    }
+  }
+  let sorted = true;
+  for (let k = 1; k < valid.length; k++) if (valid[k].ts < valid[k - 1].ts) { sorted = false; break; }
+  if (!sorted) valid.sort((a, b) => a.ts - b.ts);
+  const n = valid.length;
+  const d = { n, t0, t1, recs: valid, ts: new Float64Array(n), t: new Float64Array(n), rh: new Float64Array(n) };
+  for (let k = 0; k < n; k++) {
+    const r = valid[k];
+    d.ts[k] = r.ts; d.t[k] = r.t == null ? NaN : r.t; d.rh[k] = r.rh == null ? NaN : r.rh;
+  }
+  if (n && t1 < d.ts[n - 1]) d.t1 = d.ts[n - 1];
+  d.gap = Math.max(2.5 * medianStep(d.ts), 180);
+  d.stats = { t: seriesStats(d.t), rh: seriesStats(d.rh) };
+  d.errors = valid.filter(hasSensorError).length;
+  rangeCache = { key, d };
+  return d;
+}
+function seriesStats(a) {
+  let lo = Infinity, hi = -Infinity, sum = 0, c = 0, last = NaN;
+  for (let k = 0; k < a.length; k++) { const v = a[k]; if (v !== v) continue; if (v < lo) lo = v; if (v > hi) hi = v; sum += v; c++; last = v; }
+  return c ? { lo, hi, mean: sum / c, n: c, last } : null;
+}
+function tableRows() {
+  let rows;
+  if (S.range === 'all') rows = S.records.slice();
+  else rows = rangeData().recs.slice();
+  rows.sort((a, b) => b.i - a.i);
+  if (S.onlyFlags) rows = rows.filter((r) => hasSensorError(r) || hasTimeInvalid(r) || (r.f & FLAG.BROWNOUT));
+  return rows;
+}
+
+/* =========================================================================
+   Gráfica doble (T arriba, HR abajo, eje X compartido) en Canvas
+   ========================================================================= */
+function niceDomain(lo, hi, minSpan, target, cLo, cHi) {
+  if (!isFinite(lo) || !isFinite(hi)) { lo = 0; hi = minSpan; }
+  if (hi - lo < minSpan) { const c = (hi + lo) / 2; lo = c - minSpan / 2; hi = c + minSpan / 2; }
+  const padv = (hi - lo) * 0.06; lo -= padv; hi += padv;
+  const raw = (hi - lo) / target;
+  const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * pow).find((s) => s >= raw) || 10 * pow;
+  let a = Math.floor(lo / step) * step, b = Math.ceil(hi / step) * step;
+  if (cLo != null && a < cLo) a = cLo;
+  if (cHi != null && b > cHi) b = cHi;
+  if (b - a < step) b = a + step;
+  return { lo: a, hi: b, step, dec: step < 1 || step % 1 ? (step * 10 % 1 ? 2 : 1) : 0 };
+}
+function timeTicks(t0, t1, maxN) {
+  const span = t1 - t0, H = 3600, D = 86400;
+  const steps = [['h', 1, H], ['h', 2, 2 * H], ['h', 3, 3 * H], ['h', 6, 6 * H], ['h', 12, 12 * H], ['d', 1, D], ['d', 2, 2 * D], ['w', 1, 7 * D], ['w', 2, 14 * D], ['m', 1, 30.4 * D], ['m', 2, 61 * D], ['m', 3, 91 * D], ['m', 6, 183 * D], ['m', 12, 365 * D]];
+  const st = steps.find((s) => span / s[2] <= maxN) || steps[steps.length - 1];
+  const [u, n] = st;
+  const d = new Date(t0 * 1000);
+  if (u === 'h') { d.setMinutes(0, 0, 0); d.setHours(Math.floor(d.getHours() / n) * n); }
+  else if (u === 'd') { d.setHours(0, 0, 0, 0); }
+  else if (u === 'w') { d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); }
+  else { d.setHours(0, 0, 0, 0); d.setDate(1); d.setMonth(Math.floor(d.getMonth() / n) * n); }
+  const out = [];
+  for (let g = 0; g < 500; g++) {
+    const ts = d.getTime() / 1000;
+    if (ts > t1) break;
+    if (ts >= t0) {
+      let label;
+      if (u === 'h') label = d.getHours() === 0 ? DF.wdDay.format(d) : DF.time.format(d);
+      else if (u === 'd' || u === 'w') label = span <= 9 * D ? DF.wdDay.format(d) : DF.dayShort.format(d);
+      else label = d.getMonth() === 0 || n === 12 ? DF.monthYear.format(d) : DF.month.format(d);
+      out.push({ ts, label: label.replace(/\.$/, ''), major: u === 'h' && d.getHours() === 0 });
+    }
+    if (u === 'h') d.setHours(d.getHours() + n);
+    else if (u === 'd') d.setDate(d.getDate() + n);
+    else if (u === 'w') d.setDate(d.getDate() + 7 * n);
+    else d.setMonth(d.getMonth() + n);
+  }
+  return out;
+}
+
+class DualChart {
+  constructor(root) {
+    this.root = root;
+    this.cv = { t: $('canvas[data-plot=t]', root), rh: $('canvas[data-plot=rh]', root) };
+    this.tip = $('#chart-tip');
+    this.d = null; this.cur = -1; this.raf = 0;
+    this.geo = { L: 40, R: 14 };
+    if (typeof ResizeObserver === 'function') new ResizeObserver(() => this.request()).observe(root);
+    else window.addEventListener('resize', () => this.request());
+    root.addEventListener('pointerdown', (e) => this.pointer(e));
+    root.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse' || e.buttons || e.pointerType === 'touch' || e.pointerType === 'pen') this.pointer(e); });
+    root.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') this.setCursor(-1); });
+    root.addEventListener('keydown', (e) => this.key(e));
+    root.addEventListener('blur', () => this.setCursor(-1));
+    document.addEventListener('pointerdown', (e) => { if (!root.contains(e.target)) this.setCursor(-1); });
+  }
+  set(d) {
+    if (d === this.d) { this.request(); return; }
+    this.d = d; this.cur = -1; this.tip.hidden = true; this.request();
+  }
+  request() { cancelAnimationFrame(this.raf); this.raf = requestAnimationFrame(() => this.draw()); }
+  xOf(ts, W) { const { L, R } = this.geo; const d = this.d; return L + (ts - d.t0) / (d.t1 - d.t0) * (W - L - R); }
+  pointer(e) {
+    if (!this.d || !this.d.n) return;
+    const rect = this.cv.t.getBoundingClientRect();
+    const { L, R } = this.geo;
+    const px = clamp(e.clientX - rect.left, L, rect.width - R);
+    const ts = this.d.t0 + (px - L) / (rect.width - L - R) * (this.d.t1 - this.d.t0);
+    this.setCursor(nearest(this.d.ts, ts));
+  }
+  key(e) {
+    if (!this.d || !this.d.n) return;
+    const n = this.d.n;
+    let c = this.cur < 0 ? n - 1 : this.cur;
+    const step = e.shiftKey ? 10 : 1;
+    if (e.key === 'ArrowLeft') c = Math.max(0, c - (this.cur < 0 ? 0 : step));
+    else if (e.key === 'ArrowRight') c = Math.min(n - 1, c + (this.cur < 0 ? 0 : step));
+    else if (e.key === 'Home') c = 0;
+    else if (e.key === 'End') c = n - 1;
+    else if (e.key === 'Escape') c = -1;
+    else return;
+    e.preventDefault();
+    this.setCursor(c);
+  }
+  setCursor(c) {
+    if (c === this.cur) return;
+    this.cur = c;
+    this.request();
+    this.renderTip();
+  }
+  renderTip() {
+    const tip = this.tip, d = this.d;
+    if (this.cur < 0 || !d || !d.n) { tip.hidden = true; return; }
+    const r = d.recs[this.cur];
+    const rows = [
+      h('div', { class: 'when', text: fmt(DF.full, r.ts) }),
+      h('div', { class: 'row' }, h('i', { class: 'key t' }), h('b', { text: fT(r.t) }), h('span', { text: 'Temp.' })),
+      h('div', { class: 'row' }, h('i', { class: 'key rh' }), h('b', { text: fRH(r.rh) }), h('span', { text: 'Humedad' })),
+    ];
+    const extra = [h('span', { text: 'Batería ' + fV(r.v) })];
+    flagBadges(r, true).forEach((b) => extra.push(b));
+    rows.push(h('div', { class: 'extra' }, extra));
+    tip.replaceChildren(...rows);
+    tip.hidden = false;
+    const W = this.root.clientWidth;
+    const x = this.xOf(r.ts, this.cv.t.clientWidth) + this.cv.t.offsetLeft;
+    const tw = tip.offsetWidth;
+    let left = x + 14;
+    if (left + tw > W - 6) left = x - tw - 14;
+    tip.style.left = clamp(left, 6, Math.max(6, W - tw - 6)) + 'px';
+  }
+  draw() {
+    const C = themeColors();
+    this.plot('t', C);
+    this.plot('rh', C);
+  }
+  plot(key, C) {
+    const f = fitCanvas(this.cv[key]);
+    if (!f) return;
+    const { ctx, W, H } = f;
+    const d = this.d;
+    if (!d || !d.n) return;
+    const axisH = key === 'rh' ? 24 : 0;
+    const { L, R } = this.geo;
+    const T = 10, B = 6 + axisH;
+    const pw = W - L - R, ph = H - T - B;
+    const vals = d[key];
+    const s = d.stats[key];
+    const dom = key === 't' ? niceDomain(s ? s.lo : 15, s ? s.hi : 25, 2, 3) : niceDomain(s ? s.lo : 40, s ? s.hi : 60, 6, 3, 0, 100);
+    const y = (v) => T + (1 - (v - dom.lo) / (dom.hi - dom.lo)) * ph;
+    const x = (ts) => L + (ts - d.t0) / (d.t1 - d.t0) * pw;
+    const color = key === 't' ? C.temp : C.hum;
+    const font = C.font;
+
+    // Rejilla horizontal + etiquetas Y
+    ctx.lineWidth = 1;
+    ctx.font = '500 11px ' + font;
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    for (let v = dom.lo, g = 0; v <= dom.hi + dom.step * 0.01 && g < 20; v += dom.step, g++) {
+      const yy = Math.round(y(v)) + 0.5;
+      ctx.strokeStyle = g === 0 ? C.axis : C.grid;
+      ctx.beginPath(); ctx.moveTo(L, yy); ctx.lineTo(L + pw, yy); ctx.stroke();
+      ctx.fillStyle = C.ink3;
+      ctx.fillText(fNum(v, dom.dec), L - 8, yy);
+    }
+    // Rejilla vertical + etiquetas X (solo abajo)
+    const ticks = timeTicks(d.t0, d.t1, Math.max(2, Math.floor(pw / 64)));
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    for (const tk of ticks) {
+      const xx = Math.round(x(tk.ts)) + 0.5;
+      ctx.strokeStyle = C.grid;
+      ctx.globalAlpha = tk.major ? 1 : 0.7;
+      ctx.beginPath(); ctx.moveTo(xx, T); ctx.lineTo(xx, T + ph); ctx.stroke();
+      ctx.globalAlpha = 1;
+      if (axisH) {
+        const tw = ctx.measureText(tk.label).width;
+        if (xx - tw / 2 >= 2 && xx + tw / 2 <= W - 2) {
+          ctx.fillStyle = tk.major ? C.ink2 : C.ink3;
+          ctx.fillText(tk.label, xx, T + ph + 17);
+        }
+      }
+    }
+
+    ctx.save();
+    ctx.beginPath(); ctx.rect(L, T - 4, pw, ph + 8); ctx.clip();
+    const dense = d.n > pw / 1.5;
+    if (dense) this.drawBand(ctx, d, vals, x, y, pw, T, ph, color);
+    else this.drawLine(ctx, d, vals, x, y, T, ph, color);
+    // Marcas de error de sensor
+    ctx.fillStyle = C.bad;
+    for (let k = 0; k < d.n; k++) {
+      if (!hasSensorError(d.recs[k])) continue;
+      const xx = x(d.ts[k]), yb = T + ph - 1;
+      ctx.beginPath(); ctx.moveTo(xx, yb - 8); ctx.lineTo(xx + 5, yb); ctx.lineTo(xx - 5, yb); ctx.closePath(); ctx.fill();
+    }
+    // Punto final
+    let lastK = -1;
+    for (let k = d.n - 1; k >= 0; k--) if (vals[k] === vals[k]) { lastK = k; break; }
+    if (lastK >= 0 && this.cur < 0) dot(ctx, x(d.ts[lastK]), y(vals[lastK]), color, C.surface, 3.5);
+    ctx.restore();
+
+    // Cursor
+    if (this.cur >= 0 && this.cur < d.n) {
+      const xx = Math.round(x(d.ts[this.cur])) + 0.5;
+      ctx.strokeStyle = C.ink2; ctx.globalAlpha = 0.6; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(xx, T - 4); ctx.lineTo(xx, T + ph); ctx.stroke();
+      ctx.globalAlpha = 1;
+      const v = vals[this.cur];
+      if (v === v) dot(ctx, xx, y(v), color, C.surface, 4.5);
+    }
+  }
+  drawLine(ctx, d, vals, x, y, T, ph, color) {
+    const segs = [];
+    let cur = [];
+    for (let k = 0; k < d.n; k++) {
+      const v = vals[k];
+      if (v !== v || (k && d.ts[k] - d.ts[k - 1] > d.gap)) { if (cur.length) segs.push(cur); cur = []; }
+      if (v === v) cur.push(k);
+    }
+    if (cur.length) segs.push(cur);
+    const grad = ctx.createLinearGradient(0, T, 0, T + ph);
+    grad.addColorStop(0, rgba(color, 0.16)); grad.addColorStop(1, rgba(color, 0));
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    for (const sg of segs) {
+      ctx.beginPath();
+      sg.forEach((k, j) => (j ? ctx.lineTo(x(d.ts[k]), y(vals[k])) : ctx.moveTo(x(d.ts[k]), y(vals[k]))));
+      if (sg.length === 1) { dot(ctx, x(d.ts[sg[0]]), y(vals[sg[0]]), color, null, 2); continue; }
+      ctx.lineWidth = 2; ctx.strokeStyle = color; ctx.stroke();
+      ctx.lineTo(x(d.ts[sg[sg.length - 1]]), T + ph); ctx.lineTo(x(d.ts[sg[0]]), T + ph); ctx.closePath();
+      ctx.fillStyle = grad; ctx.fill();
+    }
+  }
+  drawBand(ctx, d, vals, x, y, pw, T, ph, color) {
+    const nb = Math.max(1, Math.floor(pw / 2));
+    const mn = new Float64Array(nb).fill(NaN), mx = new Float64Array(nb).fill(NaN), sm = new Float64Array(nb), ct = new Uint32Array(nb);
+    const span = d.t1 - d.t0;
+    for (let k = 0; k < d.n; k++) {
+      const v = vals[k];
+      if (v !== v) continue;
+      const b = clamp(Math.floor((d.ts[k] - d.t0) / span * nb), 0, nb - 1);
+      if (!(mn[b] <= v)) mn[b] = v;
+      if (!(mx[b] >= v)) mx[b] = v;
+      sm[b] += v; ct[b]++;
+    }
+    const bDur = span / nb;
+    const bx = (b) => x(d.t0 + (b + 0.5) * bDur);
+    const runs = [];
+    let run = [], prev = -1;
+    for (let b = 0; b < nb; b++) {
+      if (!ct[b]) continue;
+      if (prev >= 0 && (b - prev) * bDur > d.gap) { runs.push(run); run = []; }
+      run.push(b); prev = b;
+    }
+    if (run.length) runs.push(run);
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    for (const r of runs) {
+      ctx.beginPath();
+      r.forEach((b, j) => (j ? ctx.lineTo(bx(b), y(mx[b])) : ctx.moveTo(bx(b), y(mx[b]))));
+      for (let j = r.length - 1; j >= 0; j--) ctx.lineTo(bx(r[j]), y(mn[r[j]]));
+      ctx.closePath();
+      ctx.fillStyle = rgba(color, 0.2); ctx.fill();
+      ctx.beginPath();
+      r.forEach((b, j) => (j ? ctx.lineTo(bx(b), y(sm[b] / ct[b])) : ctx.moveTo(bx(b), y(sm[b] / ct[b]))));
+      ctx.lineWidth = 1.75; ctx.strokeStyle = color; ctx.stroke();
+    }
+  }
+}
+function dot(ctx, x, y, fill, ring, r) {
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = fill; ctx.fill();
+  if (ring) { ctx.lineWidth = 2; ctx.strokeStyle = ring; ctx.stroke(); }
+}
+function nearest(arr, v) {
+  let lo = 0, hi = arr.length - 1;
+  if (hi < 0) return -1;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (arr[m] < v) lo = m + 1; else hi = m; }
+  if (lo > 0 && Math.abs(arr[lo - 1] - v) <= Math.abs(arr[lo] - v)) return lo - 1;
+  return lo;
+}
+function flagBadges(r, compact) {
+  const out = [];
+  if (hasSensorError(r)) out.push(h('span', { class: 'badge bad', title: 'Error del sensor' }, compact ? null : icon('i-alert'), 'Error'));
+  if (hasTimeInvalid(r)) out.push(h('span', { class: 'badge warn', title: 'Hora no válida al medir' }, 'Hora'));
+  if (r.f & FLAG.BROWNOUT) out.push(h('span', { class: 'badge warn', title: 'El ciclo anterior se reinició por caída de tensión' }, 'Caída'));
+  if (r.f & FLAG.MANUAL) out.push(h('span', { class: 'badge accent', title: 'Medición manual' }, 'Manual'));
+  if (r.f & FLAG.USB) out.push(h('span', { class: 'badge', title: 'Alimentado por USB' }, 'USB'));
+  if (r.f & FLAG.UPLOAD) out.push(h('span', { class: 'badge', title: 'Ciclo con envío WiFi' }, 'WiFi'));
+  return out;
+}
+
+let chart = null;
+const renderDataSoon = debounce(() => { renderData(); if (S.tab === 'panel') renderPanel(); }, 300);
+function renderData() {
+  if (S.tab !== 'datos') return;
+  if (!chart) chart = new DualChart($('#chart'));
+  $$('#range-seg button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.range === S.range ? 'true' : 'false'));
+  const d = rangeData();
+  const root = $('#chart');
+  const empty = $('#chart-empty');
+  root.classList.toggle('loading', S.sync.running);
+  if (!d.n) {
+    root.classList.add('is-empty');
+    chart.set(null);
+    const syncing = S.sync.running;
+    const lastValid = (() => { for (let k = S.records.length - 1; k >= 0; k--) if (!hasTimeInvalid(S.records[k])) return S.records[k]; return null; })();
+    empty.replaceChildren(
+      h('div', { class: 'em-ic' }, syncing ? h('span', { class: 'spin' }) : icon('i-chart', 'i')),
+      h('b', { text: syncing ? 'Descargando lecturas…' : S.records.length ? 'Sin lecturas en este periodo' : 'Aún no hay lecturas' }),
+      h('p', { text: syncing ? 'Aparecerán aquí en cuanto lleguen del sensor.' : lastValid ? 'La última lectura es del ' + fmt(DF.date, lastValid.ts) + '. Prueba con «Todo».' : 'Conecta el sensor para descargar su historial. Se guardará en este teléfono.' }),
+    );
+    empty.hidden = false;
+  } else {
+    root.classList.remove('is-empty');
+    empty.hidden = true;
+    chart.set(d);
+    const st = d.stats;
+    $('#rng-t').textContent = st.t ? 'última ' + fNum(st.t.last) : '';
+    $('#rng-rh').textContent = st.rh ? 'última ' + fNum(st.rh.last) : '';
+    const foot = [h('span', { text: fInt(d.n) + ' lecturas · ' + fmt(DF.dayShort, d.ts[0]) + ' – ' + fmt(DF.dayShort, d.ts[d.n - 1]) })];
+    if (d.errors) foot.push(h('span', {}, h('i', { class: 'tri', 'aria-hidden': 'true' }), d.errors === 1 ? '1 error de sensor' : fInt(d.errors) + ' errores de sensor'));
+    if (d.n > 1) foot.push(h('span', { text: 'Huecos = sin datos' }));
+    $('#chart-foot').replaceChildren(...foot);
+    root.setAttribute('aria-label', 'Gráfica de ' + RANGE_LABEL[S.range] + '. Temperatura de ' + fT(st.t && st.t.lo) + ' a ' + fT(st.t && st.t.hi) + '; humedad de ' + fRH(st.rh && st.rh.lo) + ' a ' + fRH(st.rh && st.rh.hi) + '. Usa las flechas para recorrer las lecturas.');
+  }
+  renderStats(d);
+  renderTable();
+  renderSync();
+}
+function renderStats(d) {
+  const tile = (cls, label, unit, s, dec) => h('div', { class: 'stat' },
+    h('div', { class: 'metric-label' }, h('i', { class: 'key ' + cls }), label + ' ', h('span', { class: 'muted', text: unit })),
+    h('div', { class: 'stat-vals' },
+      h('div', {}, h('span', { text: 'Mín' }), h('b', { text: s ? fNum(s.lo, dec) : '—' })),
+      h('div', {}, h('span', { text: 'Media' }), h('b', { text: s ? fNum(s.mean, dec) : '—' })),
+      h('div', {}, h('span', { text: 'Máx' }), h('b', { text: s ? fNum(s.hi, dec) : '—' }))));
+  $('#stats').replaceChildren(tile('t', 'Temperatura', '°C', d.stats && d.stats.t, 1), tile('rh', 'Humedad', '%', d.stats && d.stats.rh, 1));
+}
+const PER_PAGE = 50;
+function renderTable() {
+  const rows = tableRows();
+  const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
+  S.page = clamp(S.page, 0, pages - 1);
+  const slice = rows.slice(S.page * PER_PAGE, S.page * PER_PAGE + PER_PAGE);
+  $('#tbl-title').textContent = 'Lecturas · ' + fInt(rows.length);
+  $('#tbl-body').replaceChildren(...slice.map((r) => {
+    const err = hasSensorError(r), ti = hasTimeInvalid(r);
+    return h('tr', { class: err ? 'flag-err' : ti ? 'flag-time' : null },
+      h('td', {}, ti ? h('span', { text: 'Hora no válida' }) : fmt(DF.time, r.ts), h('span', { class: 'd', text: ti ? 'registro #' + r.i : fmt(DF.dayShort, r.ts) })),
+      h('td', { class: r.t == null ? 'na' : null, text: r.t == null ? 'Error' : fNum(r.t, 1) + ' °C' }),
+      h('td', { class: r.rh == null ? 'na' : null, text: r.rh == null ? 'Error' : fNum(r.rh, 1) + ' %' }),
+      h('td', { text: fV(r.v) }),
+      h('td', {}, h('span', { class: 'flags' }, flagBadges(r, true).filter((b) => !(err && b.textContent === 'Error')))));
+  }));
+  const te = $('#tbl-empty');
+  te.hidden = rows.length > 0;
+  if (!rows.length) te.replaceChildren(h('b', { text: S.onlyFlags ? 'Sin incidencias' : 'Sin lecturas' }), h('p', { text: S.onlyFlags ? 'No hay errores, horas no válidas ni caídas de tensión en este periodo.' : 'No hay lecturas en este periodo.' }));
+  $('#pager').hidden = rows.length <= PER_PAGE;
+  $('#pg-prev').disabled = S.page === 0;
+  $('#pg-next').disabled = S.page >= pages - 1;
+  $('#pg-info').textContent = rows.length ? fInt(S.page * PER_PAGE + 1) + '–' + fInt(S.page * PER_PAGE + slice.length) + ' de ' + fInt(rows.length) : '';
+  const n = S.range === 'all' ? S.records.length : rangeData().n;
+  $('#btn-csv-text').textContent = 'Exportar CSV · ' + RANGE_LABEL[S.range] + ' (' + fInt(n) + ')';
+  $('#btn-csv').disabled = !n;
+  $('#btn-share').disabled = !n;
+}
+
+function renderSync() {
+  const row = $('#sync-row'), bar = $('#hdr-sync');
+  const sy = S.sync;
+  const show = sy.running && sy.total > 0;
+  row.hidden = !show;
+  const pct = sy.total ? clamp(sy.done / sy.total * 100, 0, 100) : 0;
+  bar.style.width = show ? pct + '%' : '0';
+  if (show) {
+    $('#sync-text').textContent = 'Descargando historial · ' + fInt(sy.done) + ' de ' + fInt(sy.total);
+    $('#sync-pct').textContent = Math.floor(pct) + ' %';
+    $('#sync-bar').style.width = pct + '%';
+  }
+}
+let syncRaf = 0;
+function renderSyncSoon() { if (!syncRaf) syncRaf = requestAnimationFrame(() => { syncRaf = 0; renderSync(); }); }
+
+/* --- CSV --- */
+function csvText(rows) {
+  const c = (v, d) => (v == null || !isFinite(v) ? '' : v.toFixed(d).replace('.', ','));
+  const flagTxt = (r) => {
+    const t = [];
+    if (r.f & FLAG.TIME_INVALID) t.push('hora no válida');
+    if (r.f & FLAG.SENSOR_ERR || r.t == null || r.rh == null) t.push('error de sensor');
+    if (r.f & FLAG.USB) t.push('USB');
+    if (r.f & FLAG.BROWNOUT) t.push('brownout previo');
+    if (r.f & FLAG.UPLOAD) t.push('envío WiFi');
+    if (r.f & FLAG.MANUAL) t.push('manual');
+    return t.join(' | ');
+  };
+  const out = ['indice;fecha_local;fecha_utc;ts_unix;temperatura_c;humedad_pct;vbat_mv;vbat_carga_mv;flags;incidencias'];
+  for (const r of rows) {
+    const ti = hasTimeInvalid(r) || !validTs(r.ts);
+    out.push([r.i, ti ? '' : DF.csv.format(new Date(r.ts * 1000)).replace(',', ''), ti ? '' : new Date(r.ts * 1000).toISOString().replace('.000Z', 'Z'), r.ts, c(r.t, 2), c(r.rh, 2), r.v || '', r.vl || '', r.f, flagTxt(r)].join(';'));
+  }
+  return '﻿' + out.join('\r\n') + '\r\n';
+}
+function csvFile() {
+  const rows = (S.range === 'all' ? S.records.slice() : rangeData().recs.slice()).sort((a, b) => a.i - b.i);
+  const d = new Date();
+  const stamp = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '-' + String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0');
+  const name = ('humedad-' + deviceName() + '-' + (S.range === 'all' ? 'todo' : S.range) + '-' + stamp + '.csv').replace(/[^A-Za-z0-9._-]+/g, '_');
+  return { name, blob: new Blob([csvText(rows)], { type: 'text/csv;charset=utf-8' }), n: rows.length };
+}
+function exportCsv() {
+  const f = csvFile();
+  const url = URL.createObjectURL(f.blob);
+  const a = h('a', { href: url, download: f.name });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  toast('CSV exportado: ' + fInt(f.n) + ' lecturas', 'ok');
+}
+async function shareCsv() {
+  const f = csvFile();
+  const file = new File([f.blob], f.name, { type: 'text/csv' });
+  try { await navigator.share({ files: [file], title: f.name }); }
+  catch (e) { if (e && e.name !== 'AbortError') toast('No se pudo compartir: ' + (e.message || e), 'err'); }
+}
+
+/* =========================================================================
+   Configuración
+   ========================================================================= */
+const FIELDS = {
+  meas_min: { kind: 'int', min: 1, max: 255 },
+  upload_min: { kind: 'int', min: 0, max: 1440 },
+  wifi_ssid: { kind: 'str', maxBytes: 32 },
+  wifi_pass: { kind: 'secret', maxBytes: 64, flag: 'wifi_pass_set' },
+  url: { kind: 'str', max: 200, trim: true },
+  token: { kind: 'secret', max: 128, flag: 'token_set', trim: true },
+  t_offset: { kind: 'num', min: -10, max: 10 },
+  rh_offset: { kind: 'num', min: -20, max: 20 },
+  tx_power: { kind: 'int', min: 2, max: 20 },
+  cfg_timeout_min: { kind: 'int', min: 1, max: 60 },
+  name: { kind: 'str', min: 1, max: 20, re: /^[A-Za-z0-9 _-]+$/ },
+};
+const inp = (k) => $('#f-' + k);
+function fmtField(k, v) {
+  const F = FIELDS[k];
+  if (v == null) return '';
+  if (F.kind === 'num') return fTrim(Number(v), 2);
+  if (F.kind === 'int') return String(v);
+  return String(v);
+}
+function parseNum(raw) {
+  const s = String(raw).trim().replace(/\s/g, '').replace('−', '-').replace(',', '.');
+  if (!/^[-+]?(\d+\.?\d*|\.\d+)$/.test(s)) return NaN;
+  return Number(s);
+}
+function readField(k) {
+  const F = FIELDS[k];
+  let raw = inp(k).value;
+  const range = (a, b, u) => 'Debe estar entre ' + fTrim(a) + ' y ' + fTrim(b) + (u ? ' ' + u : '') + '.';
+  if (F.kind === 'int') {
+    const v = parseNum(raw);
+    if (raw.trim() === '' || !Number.isInteger(v)) return { error: 'Escribe un número entero.' };
+    if (k === 'upload_min') {
+      const m = readField('meas_min');
+      const mv = m.error ? 1 : m.value;
+      if (v !== 0 && (v < mv || v > 1440)) return { value: v, error: 'Usa 0 (no enviar) o un valor entre ' + mv + ' y 1440 min.' };
+      return { value: v };
+    }
+    if (v < F.min || v > F.max) return { value: v, error: range(F.min, F.max) };
+    return { value: v };
+  }
+  if (F.kind === 'num') {
+    const v = parseNum(raw);
+    if (raw.trim() === '' || !isFinite(v)) return { error: 'Escribe un número (puedes usar coma decimal).' };
+    if (v < F.min || v > F.max) return { value: v, error: range(F.min, F.max, k === 't_offset' ? '°C' : '%') };
+    return { value: Math.round(v * 100) / 100 };
+  }
+  if (F.trim) raw = raw.trim();
+  if (F.maxBytes && TE.encode(raw).length > F.maxBytes) return { value: raw, error: 'Máximo ' + F.maxBytes + ' bytes (las letras con tilde o ñ ocupan 2).' };
+  if (F.max && raw.length > F.max) return { value: raw, error: 'Máximo ' + F.max + ' caracteres.' };
+  if (F.min && raw.length < F.min) return { value: raw, error: 'Escribe al menos ' + F.min + ' carácter.' };
+  if (F.re && raw && !F.re.test(raw)) return { value: raw, error: 'Solo letras sin tildes, números, espacios, «_» o «-».' };
+  if (k === 'url' && raw && !/^https?:\/\/[^\s]+$/i.test(raw)) return { value: raw, error: 'Debe empezar por http:// o https:// y no tener espacios.' };
+  return { value: raw };
+}
+function fillForm(cfg, force) {
+  if (!cfg) return;
+  if (!fillForm.base) force = true;
+  const prev = fillForm.base || {};
+  for (const k of Object.keys(FIELDS)) {
+    const F = FIELDS[k];
+    const el = inp(k);
+    if (F.kind === 'secret') {
+      if (k === 'token') el.placeholder = cfg[F.flag] ? '(guardado) — escribe para cambiarlo' : 'Sin token';
+      else el.placeholder = cfg[F.flag] ? '(guardada) — escribe para cambiarla' : 'Sin contraseña';
+      $('#clr-' + k + '-row').hidden = !cfg[F.flag];
+      if (force) { el.value = ''; $('#clr-' + k).checked = false; }
+      continue;
+    }
+    const untouched = force || el.value === fmtField(k, prev[k]);
+    if (untouched) el.value = fmtField(k, cfg[k]);
+  }
+  fillForm.base = Object.assign({}, cfg);
+  $('#o-tx_power').textContent = inp('tx_power').value + ' dBm';
+  $('#cfg-loading').hidden = true;
+  $('#cfg-form').hidden = false;
+  validateForm(false);
+}
+function same(a, b) { return typeof a === 'number' && typeof b === 'number' ? Math.abs(a - b) < 1e-9 : a === b; }
+function collectChanges() {
+  const base = S.cfg || {};
+  const changes = {}, errors = [];
+  for (const k of Object.keys(FIELDS)) {
+    const F = FIELDS[k];
+    if (F.kind === 'secret') {
+      const raw = F.trim ? inp(k).value.trim() : inp(k).value;
+      if (raw) {
+        const r = readField(k);
+        if (r.error) errors.push([k, r.error]); else changes[k] = r.value;
+      } else if ($('#clr-' + k).checked) changes[k] = '';
+      continue;
+    }
+    const r = readField(k);
+    if (r.error) { errors.push([k, r.error]); continue; }
+    if (!same(r.value, base[k])) changes[k] = r.value;
+  }
+  return { changes, errors };
+}
+function validateForm(showAll) {
+  const { changes, errors } = collectChanges();
+  const errMap = new Map(errors);
+  for (const k of Object.keys(FIELDS)) {
+    const wrap = $('.field[data-f="' + k + '"]');
+    const e = errMap.get(k);
+    const show = !!e && (showAll || wrap.dataset.touched === '1');
+    wrap.classList.toggle('invalid', show);
+    $('#e-' + k).textContent = show ? e : '';
+    inp(k).setAttribute('aria-invalid', show ? 'true' : 'false');
+    wrap.classList.toggle('changed', k in changes);
+  }
+  // pistas suaves
+  const pass = inp('wifi_pass').value;
+  $('#h-wifi_pass').textContent = pass && pass.length < 8 ? 'Las claves WPA suelen tener al menos 8 caracteres.' : 'Solo se envía si escribes una nueva.';
+  // chips
+  for (const k of ['meas_min', 'upload_min']) {
+    const v = readField(k).value;
+    $$('[data-chips="' + k + '"] .chip').forEach((c) => c.setAttribute('aria-pressed', Number(c.dataset.v) === v ? 'true' : 'false'));
+  }
+  $('#o-tx_power').textContent = inp('tx_power').value + ' dBm';
+  renderImpact();
+  const n = Object.keys(changes).length;
+  const bar = $('#savebar');
+  bar.hidden = n === 0 && !errors.length;
+  $('#savebar-text').textContent = errors.length && !n ? 'Hay valores no válidos' : n === 1 ? '1 cambio sin guardar' : n + ' cambios sin guardar';
+  return { changes, errors };
+}
+function renderConfigState() {
+  if (!S.cfg) {
+    const ld = $('#cfg-loading');
+    $('#cfg-form').hidden = true;
+    ld.hidden = false;
+    const waiting = S.conn === 'connecting';
+    ld.replaceChildren(
+      h('div', { class: 'em-ic' }, waiting ? h('span', { class: 'spin' }) : icon('i-sliders', 'i')),
+      h('b', { text: waiting ? 'Leyendo configuración…' : 'Sin configuración' }),
+      h('p', { text: waiting ? 'Un momento.' : 'Conecta el sensor para ver y cambiar su configuración.' }));
+  }
+}
+function renderImpact() {
+  const m = readField('meas_min'), u = readField('upload_min');
+  const box = $('#impact');
+  if (m.error || u.error) { box.replaceChildren(h('p', { class: 'muted', text: 'Corrige los intervalos para ver la autonomía estimada.' })); return; }
+  const meas = m.value, up = u.value;
+  const effUp = up > 0 ? Math.ceil(up / meas) * meas : 0;      // se sube en el primer despertar tras el plazo
+  const jMeas = (1440 / meas) * 0.012;
+  const jUp = effUp ? (1440 / effUp) * 1.0 : 0;
+  const jDay = jMeas + jUp;
+  const days = 14000 / jDay;
+  const shareUp = jUp / jDay;
+  const parts = [
+    h('div', { class: 'impact-top' }, h('span', { class: 'eyebrow', text: 'Autonomía estimada' }), h('b', { text: fYears(days) })),
+    h('div', { class: 'split', role: 'img', 'aria-label': 'Envíos ' + Math.round(shareUp * 100) + ' %, mediciones ' + Math.round((1 - shareUp) * 100) + ' % del consumo' },
+      shareUp > 0 ? h('i', { class: 'up', style: 'width:' + (shareUp * 100) + '%' }) : null,
+      h('i', { class: 'me', style: 'width:' + ((1 - shareUp) * 100) + '%' })),
+    h('div', { class: 'legend' },
+      h('span', {}, h('i', { style: 'background:var(--accent)' }), 'Envíos WiFi · ' + fNum(jUp, jUp < 10 ? 1 : 0) + ' J/día'),
+      h('span', {}, h('i', { style: 'background:var(--ink-3)' }), 'Mediciones · ' + fNum(jMeas, 2) + ' J/día')),
+  ];
+  let tipTxt;
+  if (shareUp > 0.7 && effUp < 360) {
+    const alt = 14000 / (jMeas + 1440 / (Math.ceil(360 / meas) * meas)) ;
+    tipTxt = 'Los envíos WiFi son lo que más gasta. Enviando cada 6 h la autonomía sería ' + fYears(alt).replace('≈ ', '≈ ') + '.';
+  } else if (!effUp) tipTxt = 'Sin envíos el consumo es mínimo; descarga los datos por Bluetooth.';
+  else tipTxt = 'Buen equilibrio entre frecuencia de datos y autonomía.';
+  parts.push(h('p', { text: tipTxt + ' Cálculo aproximado con una pila de litio AA (L91, ≈ 14 kJ útiles); el frío y una señal WiFi débil la reducen.' }));
+  box.replaceChildren(...parts);
+}
+function splitCfg(changes) {
+  const fits = (o) => TE.encode(JSON.stringify({ id: 2000000000, cmd: 'set_config', cfg: o })).length <= PROTO.MAX_CMD_BYTES;
+  if (fits(changes)) return [changes];
+  const groups = [];
+  const used = new Set();
+  const iv = {};
+  for (const k of ['meas_min', 'upload_min']) if (k in changes) { iv[k] = changes[k]; used.add(k); }
+  if (Object.keys(iv).length) groups.push(iv);
+  for (const k of Object.keys(changes)) if (!used.has(k)) groups.push({ [k]: changes[k] });
+  const out = [];
+  let cur = {};
+  for (const g of groups) {
+    const merged = Object.assign({}, cur, g);
+    if (fits(merged)) cur = merged;
+    else { if (Object.keys(cur).length) out.push(cur); cur = g; }
+  }
+  if (Object.keys(cur).length) out.push(cur);
+  return out;
+}
+async function saveConfig(ev) {
+  if (ev) ev.preventDefault();
+  $$('.field[data-f]').forEach((f) => { f.dataset.touched = '1'; });
+  const { changes, errors } = validateForm(true);
+  if (errors.length) {
+    const k = errors[0][0];
+    inp(k).focus();
+    toast('Revisa: ' + errors.map((e) => FIELD_NAMES[e[0]]).join(', '), 'err');
+    return;
+  }
+  if (!Object.keys(changes).length) return;
+  await withBusy($('#btn-save'), 'Guardando…', async () => {
+    try {
+      for (const batch of splitCfg(changes)) {
+        const r = await req('set_config', { cfg: batch });
+        if (r.cfg) S.cfg = r.cfg; else Object.assign(S.cfg, batch);
+      }
+      fillForm(S.cfg, true);
+      $$('.field[data-f]').forEach((f) => { delete f.dataset.touched; });
+      validateForm(false);
+      renderHeader(); renderPanel(); renderSystem();
+      toast('Configuración guardada', 'ok');
+    } catch (e) {
+      if (e.code === 'invalid' && e.field && FIELDS[e.field]) {
+        const wrap = $('.field[data-f="' + e.field + '"]');
+        wrap.classList.add('invalid');
+        $('#e-' + e.field).textContent = 'El sensor rechazó este valor' + (e.message && e.message !== 'invalid' ? ': ' + e.message : '.');
+        inp(e.field).focus();
+        toast('El sensor rechazó «' + FIELD_NAMES[e.field] + '». No se guardó nada de ese bloque.', 'err', 5000);
+      } else toast('No se pudo guardar: ' + errText(e), 'err', 5000);
+    }
+  });
+}
+async function scanWifi() {
+  const box = $('#scan');
+  await withBusy($('#btn-scan'), 'Buscando…', async () => {
+    box.hidden = false;
+    box.replaceChildren(h('div', { class: 'scan-head' }, h('span', { text: 'Buscando redes WiFi cercanas…' }), h('span', { class: 'spin' })));
+    try {
+      const r = await req('wifi_scan');
+      const best = new Map();
+      let hidden = 0;
+      for (const ap of r.aps || []) {
+        if (!ap || typeof ap.ssid !== 'string') continue;
+        if (!ap.ssid) { hidden++; continue; }
+        const p = best.get(ap.ssid);
+        if (!p || ap.rssi > p.rssi) best.set(ap.ssid, ap);
+      }
+      const aps = Array.from(best.values()).sort((a, b) => b.rssi - a.rssi);
+      const cur = inp('wifi_ssid').value;
+      const head = h('div', { class: 'scan-head' },
+        h('span', { text: aps.length ? aps.length + (aps.length === 1 ? ' red encontrada' : ' redes encontradas') + (hidden ? ' · ' + hidden + ' oculta' + (hidden > 1 ? 's' : '') : '') : 'No se encontraron redes' }),
+        h('button', { type: 'button', class: 'btn btn-ghost btn-sm', style: 'min-height:32px', onclick: () => { box.hidden = true; } }, 'Cerrar'));
+      if (!aps.length) {
+        box.replaceChildren(head, h('div', { class: 'empty', style: 'padding:18px' }, h('p', { text: 'Acércate al router o vuelve a buscar. El sensor solo ve redes de 2,4 GHz.' })));
+        return;
+      }
+      const list = h('ul', { role: 'list' }, aps.map((ap) => {
+        const lvl = ap.rssi >= -55 ? 4 : ap.rssi >= -65 ? 3 : ap.rssi >= -75 ? 2 : 1;
+        const bars = h('span', { class: 'bars' + (lvl <= 1 ? ' weak' : ''), 'aria-hidden': 'true' }, [1, 2, 3, 4].map((k) => h('i', { class: k <= lvl ? 'on' : null })));
+        const label = ['débil', 'aceptable', 'buena', 'excelente'][lvl - 1];
+        return h('li', {}, h('button', {
+          type: 'button', 'aria-current': ap.ssid === cur ? 'true' : 'false',
+          'aria-label': ap.ssid + ', señal ' + label + ' (' + ap.rssi + ' dBm)' + (ap.secure ? ', protegida' : ', abierta'),
+          onclick: (ev) => {
+            inp('wifi_ssid').value = ap.ssid;
+            $$('button', list).forEach((b) => b.setAttribute('aria-current', 'false'));
+            ev.currentTarget.setAttribute('aria-current', 'true');
+            $('.field[data-f="wifi_ssid"]').dataset.touched = '1';
+            validateForm(false);
+            if (ap.secure) inp('wifi_pass').focus();
+            else toast('Red abierta: no necesita contraseña.', 'info');
+          },
+        }, bars,
+        h('span', { style: 'min-width:0' }, h('span', { class: 'ssid', text: ap.ssid, style: 'display:block' }), h('span', { class: 'meta', text: 'Canal ' + (ap.ch != null ? ap.ch : '—') + ' · ' + ap.rssi + ' dBm · señal ' + label })),
+        ap.secure ? h('span', { title: 'Protegida', style: 'color:var(--ink-3)' }, icon('i-lock')) : h('span', { class: 'badge', text: 'Abierta' })));
+      }));
+      box.replaceChildren(head, list);
+    } catch (e) {
+      box.replaceChildren(h('div', { class: 'scan-head' }, h('span', { text: 'No se pudo buscar: ' + errText(e) })));
+    }
+  });
+}
+
+/* =========================================================================
+   Sistema
+   ========================================================================= */
+function renderSystem() {
+  if (S.tab !== 'sistema') return;
+  const st = S.status, he = S.hello;
+  $('#sys-sub').textContent = he ? 'Firmware ' + he.fw + ' · protocolo ' + he.proto : 'Sin datos';
+  const rows = [];
+  rows.push(['Nombre', deviceName()]);
+  if (he) rows.push(['MAC', h('span', { class: 'num', text: prettyMac(he.mac) })]);
+  if (st) {
+    rows.push(['Modo', st.mode === 'usb' ? 'USB (siempre activo)' : 'Configuración']);
+    const phoneNow = (S.statusPhone || nowS());
+    const sensorNow = Number(st.now) + (nowS() - phoneNow);
+    const diff = Math.round(Number(st.now) - phoneNow);
+    rows.push(['Hora del sensor', h('span', {}, validTs(sensorNow) ? fmt(DF.full, sensorNow) + ' ' : '', st.time_valid === false ? h('span', { class: 'badge warn', text: 'No válida' }) : Math.abs(diff) > 5 ? h('span', { class: 'badge warn', text: (diff > 0 ? '+' : '−') + Math.abs(diff) + ' s' }) : h('span', { class: 'badge good', text: 'En hora' }))]);
+    if (st.chip_t != null) rows.push(['Temperatura del chip', fT(st.chip_t)]);
+    if (st.uptime_s != null) rows.push(['Encendido desde hace', fDur(st.uptime_s)]);
+    if (st.wake) rows.push(['Despertó por', WAKE_TXT[st.wake] || st.wake]);
+    if (st.reset) rows.push(['Último reinicio', (RESET_TXT[st.reset] ? RESET_TXT[st.reset] + ' · ' : '') + st.reset]);
+    rows.push(['Caídas de tensión', st.brownouts ? h('span', { class: 'badge warn', text: fInt(st.brownouts) }) : '0']);
+  }
+  setKV($('#sys-kv'), rows);
+
+  const L = st && st.log;
+  const cap = (L && L.capacity) || (he && he.log_capacity) || 0;
+  const meter = $('#mem-meter');
+  if (L && cap) {
+    const pct = clamp(L.count / cap * 100, 0, 100);
+    meter.firstElementChild.style.width = Math.max(pct, 0.5) + '%';
+    meter.classList.toggle('warn', pct > 90);
+    meter.setAttribute('role', 'meter'); meter.setAttribute('aria-valuenow', String(Math.round(pct))); meter.setAttribute('aria-valuemin', '0'); meter.setAttribute('aria-valuemax', '100'); meter.setAttribute('aria-label', 'Memoria usada');
+    $('#mem-sub').textContent = fInt(L.count) + ' de ' + fInt(cap) + ' registros (' + fNum(pct, pct < 10 ? 1 : 0) + ' %)';
+    const meas = (S.cfg && S.cfg.meas_min) || 15;
+    setKV($('#mem-kv'), [
+      ['Índices disponibles', fInt(L.first) + ' – ' + fInt(Math.max(L.first, L.next - 1))],
+      ['Pendientes de enviar', fInt(L.pending || 0)],
+      ['Capacidad a este ritmo', fYears(cap * meas / 1440).replace('≈ ', '≈ ') + ' de historial'],
+      ['Cuando se llena', 'Se sobrescriben las más antiguas'],
+    ]);
+  } else {
+    meter.firstElementChild.style.width = '0';
+    $('#mem-sub').textContent = 'Sin datos';
+    setKV($('#mem-kv'), []);
+  }
+
+  const first = S.records.find((r) => !hasTimeInvalid(r));
+  const last = (() => { for (let k = S.records.length - 1; k >= 0; k--) if (!hasTimeInvalid(S.records[k])) return S.records[k]; return null; })();
+  $('#local-sub').textContent = store.kind === 'idb' ? 'Las lecturas se guardan en este navegador' : 'Memoria temporal: se perderá al cerrar';
+  setKV($('#local-kv'), [
+    ['Lecturas guardadas', fInt(S.records.length)],
+    ['Desde', first ? fmt(DF.date, first.ts) : '—'],
+    ['Hasta', last ? fmt(DF.full, last.ts) : '—'],
+    ['Almacenamiento', store.kind === 'idb' ? 'IndexedDB' : h('span', { class: 'badge warn', text: 'Solo memoria' })],
+    ['Versión de la app', APP_VERSION + (S.session && S.session.kind === 'demo' ? ' · demo' : '')],
+  ]);
+}
+
+async function actUpload(btn) {
+  const box = $('#up-result');
+  await withBusy(btn, 'Enviando… (hasta 30 s)', async () => {
+    box.hidden = false;
+    box.replaceChildren(h('div', { style: 'display:flex;gap:10px;align-items:center' }, h('span', { class: 'spin', style: 'color:var(--accent)' }), h('span', { text: 'El sensor se está conectando al WiFi y enviando…' })));
+    try {
+      const r = await req('upload_now');
+      const ok = r.code >= 200 && r.code < 300;
+      box.replaceChildren(
+        h('div', { style: 'display:flex;gap:8px;align-items:center;justify-content:space-between' }, h('b', { text: ok ? 'Envío correcto' : 'El servidor respondió con error' }), h('span', { class: 'badge ' + (ok ? 'good' : 'bad'), text: r.code ? 'HTTP ' + r.code : 'sin código' })),
+        h('dl', { class: 'kv' }, h('dt', { text: 'Lecturas enviadas' }), h('dd', { text: fInt(r.sent || 0) }), h('dt', { text: 'Duración' }), h('dd', { text: r.ms != null ? fNum(r.ms / 1000, 2) + ' s' : '—' }),
+          r.err ? h('dt', { text: 'Error' }) : null, r.err ? h('dd', { style: 'color:var(--bad)', text: r.err }) : null));
+      refreshStatus().catch(() => {});
+    } catch (e) {
+      const resp = e.response || {};
+      box.replaceChildren(
+        h('div', { style: 'display:flex;gap:8px;align-items:center;justify-content:space-between' }, h('b', { text: 'No se pudo enviar' }), h('span', { class: 'badge bad', text: e.code || 'error' })),
+        h('p', { class: 'ink2', style: 'margin-top:6px', text: errText(e) + (resp.msg ? ' (' + resp.msg + ')' : '') }),
+        resp.code ? h('p', { class: 'muted', style: 'font-size:13px;margin-top:4px', text: 'Código HTTP: ' + resp.code }) : null);
+    }
+  });
+}
+async function actExit() {
+  const c = await confirmDlg({ title: 'Salir y apagar', text: 'El sensor saldrá del modo configuración y se apagará para ahorrar batería. Seguirá midiendo según lo programado. Para volver a configurarlo, pulsa WAKE.', ok: 'Salir y apagar' });
+  if (!c.ok) return;
+  S.expect = 'exit';
+  try { await req('exit', {}, { disconnectOk: true, timeout: 6000 }); } catch (e) { if (e.code !== 'timeout' && e.code !== 'disconnected') { S.expect = null; toast(errText(e), 'err'); return; } }
+  setTimeout(() => {
+    if (S.conn === 'connected' && S.expect === 'exit') { S.expect = null; toast('El sensor salió del modo configuración (sigue alimentado por USB).', 'info', 5000); refreshStatus().catch(() => {}); }
+  }, 3500);
+}
+async function actReboot() {
+  const c = await confirmDlg({ title: 'Reiniciar el sensor', text: 'Se cortará la conexión Bluetooth. La app intentará reconectar sola; si el sensor no vuelve al modo configuración, pulsa WAKE.', ok: 'Reiniciar' });
+  if (!c.ok) return;
+  S.expect = 'reboot';
+  try { await req('reboot', {}, { disconnectOk: true, timeout: 6000 }); } catch (e) { if (e.code !== 'timeout' && e.code !== 'disconnected') { S.expect = null; toast(errText(e), 'err'); } }
+}
+async function actFactory(btn) {
+  const c = await confirmDlg({
+    title: 'Restablecer de fábrica',
+    text: 'Se borrará la configuración: red WiFi, servidor, token, calibración, intervalos y nombre. El sensor volverá a los valores por defecto.',
+    ok: 'Restablecer', danger: true,
+    check: 'También borrar las lecturas', checkHint: 'Se borran del sensor y de este teléfono. Si las necesitas, exporta antes un CSV desde «Datos».',
+  });
+  if (!c.ok) return;
+  await withBusy(btn, c.checked ? 'Borrando… (hasta 30 s)' : 'Restableciendo…', async () => {
+    try {
+      S.expect = 'reboot'; // por si el firmware se reinicia tras restablecer
+      await req('factory_reset', { erase_log: !!c.checked }, { disconnectOk: true, timeout: 45000 });
+      if (c.checked) { await store.clear(S.mac); S.records = []; S.dataVersion++; }
+      toast('Sensor restablecido de fábrica', 'ok');
+      if (S.conn === 'connected') {
+        S.expect = null;
+        fillForm.base = null;
+        S.hello = await req('hello');
+        await refreshStatus();
+        const gc = await req('get_config');
+        S.cfg = gc.cfg || {};
+        fillForm(S.cfg, true);
+        renderAll();
+      }
+    } catch (e) { if (S.conn === 'connected') S.expect = null; toast('No se pudo restablecer: ' + errText(e), 'err'); }
+  });
+}
+
+function renderAll() { renderHeader(); renderPanel(); renderData(); renderSystem(); renderSync(); renderConfigState(); }
+
+/* =========================================================================
+   Pantalla de conexión
+   ========================================================================= */
+function buildDial() {
+  const P = (deg, r) => { const a = deg * Math.PI / 180; return [100 + r * Math.cos(a), 100 + r * Math.sin(a)]; };
+  const arc = (a0, a1, r) => { const p0 = P(a0, r), p1 = P(a1, r); return 'M' + p0[0].toFixed(2) + ' ' + p0[1].toFixed(2) + ' A' + r + ' ' + r + ' 0 ' + (a1 - a0 > 180 ? 1 : 0) + ' 1 ' + p1[0].toFixed(2) + ' ' + p1[1].toFixed(2); };
+  const v = 0.62, a0 = 135, a1 = 405, av = a0 + (a1 - a0) * v;
+  let ticks = '';
+  for (let k = 0; k <= 40; k++) {
+    const a = a0 + (a1 - a0) * k / 40, major = k % 10 === 0;
+    const p = P(a, 68), q = P(a, major ? 59 : 63);
+    ticks += '<line x1="' + p[0].toFixed(2) + '" y1="' + p[1].toFixed(2) + '" x2="' + q[0].toFixed(2) + '" y2="' + q[1].toFixed(2) + '" class="' + (major ? 'tk mj' : 'tk') + '"/>';
+  }
+  const lab = (t, k) => { const p = P(a0 + (a1 - a0) * k, 47); return '<text x="' + p[0].toFixed(1) + '" y="' + (p[1] + 3.5).toFixed(1) + '" class="dl">' + t + '</text>'; };
+  const n1 = P(av, 56), n0 = P(av + 180, 10);
+  $('#dial').innerHTML =
+    '<svg viewBox="0 0 200 200">' +
+    '<circle class="pulse" cx="100" cy="100" r="92"/><circle class="pulse" cx="100" cy="100" r="92" style="animation-delay:.9s"/>' +
+    '<path class="trk" d="' + arc(a0, a1, 84) + '"/>' +
+    '<path class="val" d="' + arc(a0, av, 84) + '"/>' + ticks + lab('0', 0) + lab('50', 0.5) + lab('100', 1) +
+    '<g class="needle"><line x1="' + n0[0].toFixed(2) + '" y1="' + n0[1].toFixed(2) + '" x2="' + n1[0].toFixed(2) + '" y2="' + n1[1].toFixed(2) + '" class="nd"/></g>' +
+    '<circle cx="100" cy="100" r="24" class="hub"/>' +
+    '<path class="drop" d="M100 86.5c-4.6 5.7-8.6 10.4-8.6 15.1a8.6 8.6 0 0 0 17.2 0c0-4.7-4-9.4-8.6-15.1z"/>' +
+    '<text x="100" y="154" class="dv">% HR</text>' +
+    '</svg>';
+}
+function setConnectMsg(t, err) { const el = $('#connect-msg'); el.textContent = t || ''; el.classList.toggle('err', !!err); }
+function unsupportedReason() {
+  if (!window.isSecureContext) return ['Hace falta una conexión segura', 'Abre esta página por HTTPS (o como http://localhost) para poder usar Bluetooth.'];
+  const ua = navigator.userAgent || '';
+  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return ['iPhone y iPad no permiten Bluetooth web', 'Ningún navegador de iOS admite Web Bluetooth. Usa Chrome en un teléfono Android, o Chrome/Edge en un ordenador (Windows, Mac o Linux).'];
+  if (/Firefox\//.test(ua)) return ['Firefox no es compatible', 'Firefox no incluye Web Bluetooth. Abre esta página en Chrome para Android, o en Chrome/Edge en un ordenador.'];
+  return ['Este navegador no permite Bluetooth', 'Abre esta página en Chrome para Android, o en Chrome/Edge en un ordenador (Windows, Mac o Linux).'];
+}
+function friendlyConnectError(e) {
+  const m = String((e && e.message) || e);
+  if (e && e.name === 'NotFoundError') {
+    if (/adapter|not available|Bluetooth.*off/i.test(m)) return 'El Bluetooth está apagado o no disponible. Actívalo y vuelve a intentarlo.';
+    return 'No se eligió ningún sensor. Si no aparece en la lista, pulsa WAKE en el sensor y acércate.';
+  }
+  if (e && e.name === 'SecurityError') return 'El navegador bloqueó el acceso a Bluetooth. Revisa los permisos del sitio.';
+  if (e && e.code === 'timeout') return 'El sensor no respondió. Pulsa WAKE y vuelve a intentarlo.';
+  return errText(e);
+}
+async function onConnect(btn) {
+  setConnectMsg('');
+  const tr = new BleTransport();
+  try { await tr.choose(); }
+  catch (e) { setConnectMsg(friendlyConnectError(e), !(e && e.name === 'NotFoundError' && !/adapter/i.test(e.message))); return; }
+  await connectWith(tr, btn);
+}
+async function connectWith(tr, btn) {
+  const dial = $('#dial');
+  dial.classList.add('searching');
+  try {
+    await withBusy(btn, tr.kind === 'demo' ? 'Preparando demo…' : 'Conectando…', () => startSession(tr));
+    setConnectMsg('');
+  } catch (e) {
+    if (!$('#view-main').hidden) { $('#view-main').hidden = true; $('#view-connect').hidden = false; }
+    setConnectMsg(friendlyConnectError(e), true);
+    S.session = null; setConn('idle');
+  } finally { dial.classList.remove('searching'); }
+}
+
+/* =========================================================================
+   Arranque
+   ========================================================================= */
+function init() {
+  buildDial();
+  const supported = BleTransport.supported() && window.isSecureContext;
+  if (!supported) {
+    const [t, x] = unsupportedReason();
+    $('#bt-unsupported-title').textContent = t;
+    $('#bt-unsupported-text').textContent = x + ' Mientras tanto puedes probar la app sin sensor.';
+    $('#bt-unsupported').hidden = false;
+    $('#btn-connect').disabled = true;
+    $('#btn-demo').className = 'btn btn-secondary btn-xl';
+  } else if (navigator.bluetooth.getAvailability) {
+    navigator.bluetooth.getAvailability().then((a) => { if (!a) setConnectMsg('Parece que el Bluetooth está apagado o no hay adaptador. Actívalo antes de conectar.'); }).catch(() => {});
+  }
+  $('#btn-connect').addEventListener('click', (e) => onConnect(e.currentTarget));
+  $('#btn-demo').addEventListener('click', (e) => { S.demo = S.demo || new DemoSensor(); connectWith(new DemoTransport(S.demo), e.currentTarget); });
+
+  // Pestañas
+  $$('.nav [role=tab]').forEach((b) => b.addEventListener('click', () => selectTab(b.dataset.tab)));
+  $('.nav').addEventListener('keydown', (e) => {
+    const i = TABS.indexOf(S.tab);
+    let n = -1;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') n = (i + 1) % TABS.length;
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') n = (i + TABS.length - 1) % TABS.length;
+    else if (e.key === 'Home') n = 0; else if (e.key === 'End') n = TABS.length - 1;
+    if (n >= 0) { e.preventDefault(); selectTab(TABS[n], true); }
+  });
+
+  // Panel
+  $('#btn-measure').addEventListener('click', (e) => withBusy(e.currentTarget, 'Midiendo…', async () => {
+    try {
+      const r = await req('measure');
+      S.measured = { ts: r.ts, t: r.t, rh: r.rh, batt_mv: r.batt_mv };
+      renderPanel(); flashHero();
+    } catch (err) { toast('No se pudo medir: ' + errText(err), 'err'); }
+  }));
+  const toData = () => { S.range = '24h'; S.page = 0; selectTab('datos'); };
+  $('#spark-t').addEventListener('click', toData);
+  $('#spark-rh').addEventListener('click', toData);
+
+  // Datos
+  $$('#range-seg button').forEach((b) => b.addEventListener('click', () => { S.range = b.dataset.range; S.page = 0; renderData(); }));
+  $('#tbl-only-flags').addEventListener('click', (e) => { S.onlyFlags = !S.onlyFlags; e.currentTarget.setAttribute('aria-pressed', String(S.onlyFlags)); S.page = 0; renderTable(); });
+  $('#pg-prev').addEventListener('click', () => { S.page--; renderTable(); });
+  $('#pg-next').addEventListener('click', () => { S.page++; renderTable(); });
+  $('#btn-csv').addEventListener('click', exportCsv);
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [new File(['x'], 'x.csv', { type: 'text/csv' })] })) {
+      $('#btn-share').hidden = false;
+      $('#btn-share').addEventListener('click', shareCsv);
+    }
+  } catch (e) { /* sin compartir */ }
+
+  // Configuración
+  const form = $('#cfg-form');
+  form.addEventListener('submit', saveConfig);
+  form.addEventListener('input', (e) => {
+    const f = e.target.closest('.field[data-f]');
+    if (f && e.target.matches('input:not([type=checkbox])')) f.dataset.touched = f.dataset.touched || (e.target.type === 'range' ? '1' : '');
+    validateForm(false);
+  });
+  form.addEventListener('focusout', (e) => { const f = e.target.closest('.field[data-f]'); if (f && e.target.matches('input')) { f.dataset.touched = '1'; validateForm(false); } });
+  form.addEventListener('change', () => validateForm(false));
+  $$('[data-chips] .chip').forEach((c) => c.addEventListener('click', () => {
+    const k = c.parentElement.dataset.chips;
+    inp(k).value = c.dataset.v;
+    $('.field[data-f="' + k + '"]').dataset.touched = '1';
+    validateForm(false);
+  }));
+  $$('[data-step]').forEach((b) => b.addEventListener('click', () => {
+    const k = b.dataset.step, F = FIELDS[k];
+    const cur = parseNum(inp(k).value);
+    const v = clamp(Math.round(((isFinite(cur) ? cur : 0) + Number(b.dataset.d)) * 100) / 100, F.min, F.max);
+    inp(k).value = fTrim(v, 2);
+    validateForm(false);
+  }));
+  $$('[data-reveal]').forEach((b) => b.addEventListener('click', () => {
+    const el = $('#' + b.dataset.reveal);
+    const show = el.type === 'password';
+    el.type = show ? 'text' : 'password';
+    b.setAttribute('aria-label', (show ? 'Ocultar ' : 'Mostrar ') + (b.dataset.reveal === 'f-token' ? 'token' : 'contraseña'));
+    b.querySelector('use').setAttribute('href', show ? '#i-eye-off' : '#i-eye');
+  }));
+  $('#btn-discard').addEventListener('click', () => {
+    fillForm(S.cfg, true);
+    $$('.field[data-f]').forEach((f) => { delete f.dataset.touched; });
+    $('#scan').hidden = true;
+    validateForm(false);
+  });
+  $('#btn-scan').addEventListener('click', scanWifi);
+
+  // Sistema
+  $('#act-time').addEventListener('click', (e) => withBusy(e.currentTarget, 'Sincronizando…', async () => {
+    const before = S.status ? Math.round(Number(S.status.now) - (S.statusPhone || nowS())) : null;
+    try { await setTime(); toast('Hora sincronizada' + (before ? ' (iba ' + (before > 0 ? 'adelantado ' : 'atrasado ') + Math.abs(before) + ' s)' : ''), 'ok'); refreshStatus().catch(() => {}); }
+    catch (err) { toast('No se pudo sincronizar: ' + errText(err), 'err'); }
+  }));
+  $('#act-upload').addEventListener('click', (e) => actUpload(e.currentTarget));
+  $('#act-exit').addEventListener('click', actExit);
+  $('#act-reboot').addEventListener('click', actReboot);
+  $('#act-disconnect').addEventListener('click', () => { S.expect = 'user'; S.reconnectToken++; client() && client().disconnect(); });
+  $('#act-factory').addEventListener('click', (e) => actFactory(e.currentTarget));
+  $('#btn-other').addEventListener('click', goConnectScreen);
+  $('#btn-clear-cache').addEventListener('click', async () => {
+    const c = await confirmDlg({ title: 'Borrar lecturas de este teléfono', text: 'Se borrarán las lecturas guardadas en este teléfono para este sensor. No afecta a las del sensor: se volverán a descargar la próxima vez que conectes.', ok: 'Borrar', danger: true });
+    if (!c.ok || !S.mac) return;
+    await store.clear(S.mac);
+    S.records = []; S.dataVersion++;
+    renderAll();
+    toast('Lecturas borradas de este teléfono', 'ok');
+    if (S.conn === 'connected') syncLog();
+  });
+
+  // Sondeo de estado (mantiene vivo el modo configuración) solo con la página visible
+  setInterval(pollStatus, 10000);
+  setInterval(() => { if (!$('#view-main').hidden) renderHeaderSub(); }, 1000);
+  setInterval(() => { if (!$('#view-main').hidden && S.tab === 'panel') renderPanel(); }, 60000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { pollStatus(); renderAll(); } });
+  if (window.matchMedia) {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const re = () => { renderPanel(); if (chart) chart.request(); };
+    if (mq.addEventListener) mq.addEventListener('change', re); else if (mq.addListener) mq.addListener(re);
+  }
+
+  // PWA
+  let deferred = null;
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferred = e; $('#btn-install').hidden = false; });
+  $('#btn-install').addEventListener('click', async () => { if (!deferred) return; deferred.prompt(); try { await deferred.userChoice; } catch (e) { /* nada */ } deferred = null; $('#btn-install').hidden = true; });
+  window.addEventListener('appinstalled', () => { $('#btn-install').hidden = true; });
+  if ('serviceWorker' in navigator && window.isSecureContext && location.protocol !== 'file:') {
+    navigator.serviceWorker.register('./sw.js').then(() => navigator.serviceWorker.ready).then(() => {
+      $('#offline-state').textContent = 'Lista para usar sin internet';
+    }).catch(() => {});
+  }
+  storeReady.then(() => renderSystem());
+}
+
+init();
+})();
+</script>
+</body>
+</html>
